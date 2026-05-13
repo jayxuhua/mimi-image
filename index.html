@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CND Image 创意工作台 - GPT Image 2</title>
+  <meta name="author" content="EllisFan<ellisfan07@gmail.com>">
+  <meta name="keywords" content="CND Image,创意工作台,GPT Image 2,图像生成,AI创意工作台">
+  <meta name="description" content="CND Image 创意工作台，支持GPT Image 2图像生成">
+  <link rel="icon" href="assets/images/logo.png">
+  <link rel="stylesheet" href="vendor/viewerjs/viewer.min.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon" onclick="window.location.href='https://cnd.cool'"><img src="assets/images/logo.png" alt="CND Image"></div>
+          <div>
+            <div class="logo-text">CND Image</div>
+            <div class="logo-sub">AI·创意工作台</div>
+          </div>
+          <span class="key-dot" id="keyDot" title="API Key 未配置"></span>
+          <button class="settings-btn" id="settingsBtn" title="设置 API Key">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65
+               1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65
+               0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3
+               a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06
+               A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0
+               001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2
+               0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-scroll">
+        <hr class="divider" style="margin-top:0;" />
+
+        <!-- Mode Selection -->
+        <div class="section">
+          <div class="section-label">生图模式</div>
+          <div class="seg" id="asyncModeSeg">
+            <button class="seg-btn" data-async-mode="sync">同步生图</button>
+            <button class="seg-btn active" data-async-mode="async">✦ 异步生图(推荐)</button>
+          </div>
+        </div>
+
+        <!-- Prompt -->
+        <div class="section">
+          <div class="section-label">描述 Prompt</div>
+          <div class="prompt-editor">
+            <div class="prompt-toolbar" role="toolbar" aria-label="提示词工具">
+              <button type="button" class="prompt-tool-btn" id="clearPromptBtn" title="清空">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                <span>清空</span>
+              </button>
+              <button type="button" class="prompt-tool-btn" id="fillExampleBtn" title="示例">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+                  <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+                </svg>
+                <span>示例</span>
+              </button>
+              <button type="button" class="prompt-tool-btn" id="openHistoryBtn" title="历史">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <span>历史</span>
+              </button>
+              <button type="button" class="prompt-tool-btn" id="refImageBtn" title="参考图">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>参考图</span>
+              </button>
+            </div>
+            <div class="prompt-box">
+              <textarea id="prompt" placeholder="描述你想要生成的图像内容，越详细越好……"></textarea>
+            </div>
+          </div>
+          <div class="ref-images" id="refImages"></div>
+          <div class="char-count">
+            <span id="charCount">0</span> 字符，<span id="tokenCount">0</span> Token
+          </div>
+        </div>
+
+        <!-- Size -->
+        <div class="section">
+          <div class="section-label">画面比例</div>
+
+          <!-- CND 渠道：比例 chip 网格 + 像素预设 + 自定义尺寸 -->
+          <div id="sizeSection" style="display:none;">
+            <!-- 比例 / 像素 模式切换 -->
+            <div class="seg" id="sizeModeSeg" style="margin-bottom:10px;">
+              <button class="seg-btn active" data-size-mode="ratio">比例</button>
+              <button class="seg-btn" data-size-mode="pixel">像素</button>
+            </div>
+
+            <!-- 比例模式：chip 由 JS 渲染 -->
+            <div id="ratioPanel" class="size-ratio-panel"></div>
+
+            <!-- 像素模式：预设 + 自定义 -->
+            <div id="pixelPanel" style="display:none;">
+              <div class="size-grid" id="pixelPresetGrid">
+                <div class="size-option" data-size-px="1024x1024">
+                  <div class="size-preview">
+                    <div class="size-rect" style="width:28px;height:28px;"></div>
+                  </div>
+                  <div class="size-label">方形<br/>1024×1024</div>
+                </div>
+                <div class="size-option" data-size-px="1024x1792">
+                  <div class="size-preview">
+                    <div class="size-rect" style="width:18px;height:30px;"></div>
+                  </div>
+                  <div class="size-label">竖版<br/>1024×1792</div>
+                </div>
+                <div class="size-option" data-size-px="1792x1024">
+                  <div class="size-preview">
+                    <div class="size-rect" style="width:30px;height:18px;"></div>
+                  </div>
+                  <div class="size-label">横版<br/>1792×1024</div>
+                </div>
+              </div>
+
+              <!-- 自定义尺寸输入 -->
+              <div class="size-custom-panel" id="customSizePanel">
+                <div class="size-custom-row">
+                  <input type="number" id="customWidthInput" placeholder="宽" min="16" max="3840" step="16" />
+                  <span class="size-custom-sep">×</span>
+                  <input type="number" id="customHeightInput" placeholder="高" min="16" max="3840" step="16" />
+                  <button type="button" class="size-custom-apply" id="customSizeApplyBtn">应用</button>
+                </div>
+                <div class="size-custom-hint">每边 16–3840 px，须为 16 的倍数；尺寸约 1024×640 至 3840×2160（最大 4K）</div>
+                <div class="size-custom-error" id="customSizeError"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quality -->
+        <div class="section">
+          <div class="section-label">生成质量</div>
+          <div class="seg">
+            <button class="seg-btn" data-q="low">低</button>
+            <button class="seg-btn" data-q="medium">中</button>
+            <button class="seg-btn active" data-q="high">高</button>
+          </div>
+        </div>
+
+        <!-- Output Format -->
+        <div class="section" id="formatSection" style="display:none;">
+          <div class="section-label">输出格式</div>
+          <div class="seg">
+            <button class="seg-btn active" data-fmt="PNG">PNG</button>
+            <button class="seg-btn" data-fmt="JPEG">JPEG</button>
+            <button class="seg-btn" data-fmt="WEBP">WEBP</button>
+          </div>
+        </div>
+
+        <!-- Compression (JPEG / WEBP only) -->
+        <div class="section" id="compressionSection" style="display:none;">
+          <div class="section-label">压缩级别</div>
+          <div class="slider-wrap">
+            <input type="range" id="compression" min="0" max="100" value="100" />
+            <span class="slider-val"><span id="compressionVal">100</span></span>
+          </div>
+        </div>
+
+        <!-- Count -->
+        <div class="section">
+          <div class="section-label">生成数量</div>
+          <div class="stepper">
+            <button id="minusBtn">−</button>
+            <span id="countVal">1</span>
+            <button id="plusBtn">+</button>
+          </div>
+          <div class="count-max-hint">
+            当前渠道单次最多可生成 <span id="maxCount">-</span> 张
+          </div>
+        </div>
+
+        <!-- CND experimental features -->
+        <div class="section cnd-experimental-section" id="cndExperimentalSection" style="display:none;">
+          <div class="section-label">
+            实验性功能
+            <span class="beta-tag">Beta</span>
+          </div>
+          <div class="experimental-toggles">
+            <label class="toggle-row" title="开启后请求附带 moderation 参数，服务端对内容进行安全审核">
+              <span class="toggle-label">内容审核 (moderation)</span>
+              <input type="checkbox" id="cndModerationToggle" />
+              <span class="toggle-switch"></span>
+            </label>
+            <label class="toggle-row" title="开启后使用流式输出，逐步返回局部预览图（partial_images）。请求完成前请勿离开页面">
+              <span class="toggle-label">流式输出 + 局部预览</span>
+              <input type="checkbox" id="cndStreamToggle" />
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <div class="modal-note" style="margin-top:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            实验性功能由上游支持情况决定，可能影响生成速度或结果。
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Generate -->
+        <div class="section">
+          <button class="gen-btn" id="genBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            开始生成
+          </button>
+          <div class="shortcut-hint" id="shortcutHint"></div>
+        </div>
+
+        <!-- Token stats (last request) -->
+        <div id="tokenInfo" style="display:none;">
+          <div class="section-label">Token 消耗</div>
+          <div class="token-info">
+            <span class="token-chip">输入 <span id="tokIn">—</span></span>
+            <span class="token-chip">输出 <span id="tokOut">—</span></span>
+            <span class="token-chip">合计 <span id="tokTotal">—</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cumulative Token Stats -->
+      <div style="padding:10px 20px;border-top:1px solid var(--border);flex-shrink:0;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">累计 Token 消耗</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--text-dim);">输入 <span id="cumulativeIn" style="color:var(--text);">0</span></span>
+          <span style="font-size:12px;color:var(--text-dim);">输出 <span id="cumulativeOut" style="color:var(--text);">0</span></span>
+          <span style="font-size:12px;color:var(--text-dim);">合计 <span id="cumulativeTotal" style="color:var(--text);">0</span></span>
+        </div>
+      </div>
+
+      <!-- Copyright -->
+      <div style="padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;">
+        <p style="font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6;">
+          © 2026
+          <a href="https://api.cnd.cool/register?aff=O3iX" target="_blank" rel="noopener"
+            style="color:var(--text-muted);text-decoration:none;transition:color .15s;"
+            onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--text-muted)'">
+            CND
+          </a>
+          · Powered by <a href="https://github.com/ellisfan/cnd-image" target="_blank" rel="noopener"
+            style="color:var(--text-muted);text-decoration:none;transition:color .15s;"
+            onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--text-muted)'">Ellis Fan</a> · v<span id="version"></span>
+        </p>
+      </div>
+    </aside>
+
+    <!-- ── Canvas ── -->
+    <main class="canvas">
+      <div class="canvas-toolbar">
+        <span class="toolbar-title" id="toolbarTitle">等待生成…</span>
+        <span class="toolbar-badge" id="toolbarBadge" style="display:none"></span>
+        <button class="toolbar-btn" id="clearBtn" style="display:none">清空画布</button>
+      </div>
+
+      <div class="canvas-body" id="canvasBody">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">✦</div>
+          <h3>输入提示词，开始创作</h3>
+          <p>在左侧填写描述，选择参数，点击「开始生成」即可生成 AI 图像</p>
+        </div>
+        <div class="chat-feed" id="chatFeed"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ── Settings Modal ── -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted)">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65
+           1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65
+           0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3
+           a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06
+           A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0
+           001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2
+           0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <h2>设置</h2>
+        <button class="modal-close" id="settingsCloseBtn">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- CND Key -->
+        <div id="cndKeySection">
+          <div class="modal-field-label" style="display:flex;align-items:center;justify-content:space-between;">
+            CND API Key
+            <a href="https://api.cnd.cool/register?aff=O3iX" target="_blank" rel="noopener" class="modal-link">
+              获取 API Key →
+            </a>
+          </div>
+          <div class="input-wrap">
+            <input type="password" id="modalCndKey" placeholder="sk-..." autocomplete="off" />
+            <button class="input-eye" id="modalCndEyeBtn" title="显示/隐藏">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-note" style="margin-top:10px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          所有数据仅保存在本机浏览器缓存中，不上传任何服务器。
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;" />
+
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+          <span>缓存大小：<span id="cacheSize">—</span></span>
+          <button class="btn-ghost danger" id="clearRecordsBtn" style="padding:4px 10px;font-size:12px;">
+            清除记录
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost danger" id="clearKeyBtn">清除当前渠道 Key</button>
+        <button class="btn-ghost" id="cancelSettingsBtn">取消</button>
+        <button class="btn-primary" id="saveSettingsBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Image Detail Modal ── -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted)">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <h2>生成详情</h2>
+        <button class="modal-close" id="detailCloseBtn">✕</button>
+      </div>
+      <div class="modal-body" id="detailModalBody" style="max-height:60vh;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- ── Examples Modal ── -->
+  <div class="modal-overlay" id="examplesModal">
+    <div class="modal modal-gallery">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted)">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        <h2>选择示例</h2>
+        <button class="modal-close" id="examplesCloseBtn">✕</button>
+      </div>
+      <div class="modal-body modal-gallery-body" id="examplesModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ── History Modal ── -->
+  <div class="modal-overlay" id="historyModal">
+    <div class="modal modal-gallery">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted)">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <h2>生成历史</h2>
+        <button class="modal-close" id="historyCloseBtn">✕</button>
+      </div>
+      <div class="modal-body modal-gallery-body" id="historyModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ── Reference image upload modal ── -->
+  <div class="modal-overlay" id="refUploadModal">
+    <div class="modal" style="width:440px;max-width:calc(100vw - 32px);">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted)">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <h2>上传参考图</h2>
+        <button type="button" class="modal-close" id="refUploadModalCloseX">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-note ref-upload-expire-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          文件上传后链接有效期为 <span id="refUploadExpire">48</span> 小时，超期后链接可能失效，需重新上传。
+        </div>
+        <input type="file" id="refUploadInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple
+          style="display:none" />
+        <label for="refUploadInput" class="ref-upload-zone" id="refUploadZone" tabindex="0">
+          <div class="ref-upload-zone-inner">
+            <svg class="ref-upload-zone-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span class="ref-upload-zone-title">点击或拖拽图片到此处</span>
+            <span class="ref-upload-zone-hint">JPG / JPEG / PNG，单张不超过 5MB，最多 10 张</span>
+          </div>
+          <div class="ref-upload-zone-busy" id="refUploadBusy" style="display:none;">上传中…</div>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" id="refUploadModalCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Release notes ── -->
+  <div class="modal-overlay" id="releaseNotesModal" style="z-index:540;">
+    <div class="modal" style="width:440px;max-width:calc(100vw - 32px);">
+      <div class="modal-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="color:var(--text-muted);flex-shrink:0">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <h2 id="releaseNotesHeading">版本更新</h2>
+        <button type="button" class="modal-close" id="releaseNotesCloseBtn" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top:12px;">
+        <div class="release-notes-meta" id="releaseNotesMeta"></div>
+        <ul class="release-notes-list" id="releaseNotesList"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="releaseNotesOkBtn">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
