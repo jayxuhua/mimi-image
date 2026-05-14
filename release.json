@@ -1,5 +1,27 @@
 [
   {
+    "version": "1.2.7",
+    "update_time": "2026-05-14",
+    "update_content": [
+      {
+        "type": "optimize",
+        "text": "点击「使用示例」或「使用配置」后弹窗自动关闭，操作更流畅"
+      },
+      {
+        "type": "optimize",
+        "text": "示例弹窗与历史弹窗支持点击遮罩层关闭"
+      },
+      {
+        "type": "add",
+        "text": "同一对话行的多张图片预览时支持左右切换，无需逐张点开"
+      },
+      {
+        "type": "fix",
+        "text": "修复刷新后异步批次合并行不在可视区域的滚动问题"
+      }
+    ]
+  },
+  {
     "version": "1.2.6",
     "update_time": "2026-05-14",
     "update_content": [

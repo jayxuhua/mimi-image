@@ -176,6 +176,9 @@ function setHistoryRecords(records) {
 
   // Resume pending async tasks (page-reload recovery)
   await resumePendingTasks();
+
+  // Final scroll after all rows (completed + pending) are in the DOM
+  requestAnimationFrame(() => scrollToLatest(true));
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,8 +329,14 @@ function wireEvents() {
   document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
   // Examples modal
   document.getElementById('examplesCloseBtn').addEventListener('click', closeExamplesModal);
+  document.getElementById('examplesModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeExamplesModal();
+  });
   // History modal
   document.getElementById('historyCloseBtn').addEventListener('click', closeHistoryModal);
+  document.getElementById('historyModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeHistoryModal();
+  });
 
   // Global keyboard
   document.addEventListener('keydown', e => {
@@ -496,6 +505,7 @@ async function dismissReleaseNotesModal() {
       console.warn('[kv release ack]', e);
     }
   }
+  location.reload();
 }
 
 async function maybeShowReleaseNotes() {
@@ -1039,27 +1049,39 @@ function hideSkeletonInRow(row) {
 // ─────────────────────────────────────────────────────────────────────────────
 let _viewer = null;
 
-function openLightbox(src) {
+function openLightbox(srcs, initialIndex = 0) {
   if (_viewer) { _viewer.destroy(); _viewer = null; }
-  const el = document.createElement('img');
-  el.src = src;
-  el.style.display = 'none';
-  document.body.appendChild(el);
-  _viewer = new Viewer(el, {
-    navbar: false,
-    title: false,
+
+  const srcList = Array.isArray(srcs) ? srcs : [srcs];
+  const idx = Math.max(0, Math.min(initialIndex, srcList.length - 1));
+
+  const container = document.createElement('ul');
+  container.style.display = 'none';
+  srcList.forEach(s => {
+    const li = document.createElement('li');
+    const img = document.createElement('img');
+    img.src = s;
+    li.appendChild(img);
+    container.appendChild(li);
+  });
+  document.body.appendChild(container);
+
+  _viewer = new Viewer(container, {
+    navbar:           srcList.length > 1,
+    title:            false,
+    initialViewIndex: idx,
     toolbar: {
-      zoomIn: 4,
-      zoomOut: 4,
-      oneToOne: 4,
-      reset: 4,
-      rotateLeft: 4,
+      zoomIn:      4,
+      zoomOut:     4,
+      oneToOne:    4,
+      reset:       4,
+      rotateLeft:  4,
       rotateRight: 4,
     },
     hidden() {
       _viewer.destroy();
       _viewer = null;
-      el.remove();
+      container.remove();
     },
   });
   _viewer.show();
@@ -1343,18 +1365,35 @@ async function loadRecordsToCanvas() {
   // getRecentRecordsByImageLimit 返回从新到旧；翻转为从旧到新 append，保持时间顺序
   const ordered = records.slice().reverse();
 
+  // Group records with the same batchId into one chat row
+  const batches = [];
+  const batchIdMap = new Map(); // batchId → index in batches[]
   for (const rec of ordered) {
     if (!rec.images?.length) continue;
-    const row = createChatRow(rec.prompt, {
-      size:    rec.size,
-      quality: rec.quality,
-      format:  rec.format,
-      channel: rec.channel || 'cnd',
-      count:   rec.count || 1,
-      ts:      rec.ts,
+    if (rec.batchId && batchIdMap.has(rec.batchId)) {
+      batches[batchIdMap.get(rec.batchId)].push(rec);
+    } else {
+      const idx = batches.length;
+      batches.push([rec]);
+      if (rec.batchId) batchIdMap.set(rec.batchId, idx);
+    }
+  }
+
+  for (const batch of batches) {
+    const first = batch[0];
+    const totalImages = batch.reduce((sum, r) => sum + (r.images?.length || 0), 0);
+    const row = createChatRow(first.prompt, {
+      size:    first.size,
+      quality: first.quality,
+      format:  first.format,
+      channel: first.channel || 'cnd',
+      count:   totalImages,
+      ts:      first.ts,
     });
-    row.dataset.recId = rec.id;
-    await renderStoredRecordImages(rec, row);
+    row.dataset.recId = first.id;
+    for (const rec of batch) {
+      await renderStoredRecordImages(rec, row);
+    }
   }
 
   document.getElementById('emptyState').style.display = 'none';
@@ -1450,7 +1489,13 @@ function buildImageCard(src, imageRef, fmt, size, sw, sh, cw, recId, channel, id
     e.stopPropagation();
     void deleteImageCard(card);
   });
-  card.querySelector('img').addEventListener('click', () => openLightbox(src));
+  card.querySelector('img').addEventListener('click', () => {
+    const col = card.closest('.chat-col-images');
+    const allCards = col ? [...col.querySelectorAll('.image-card')] : [card];
+    const srcs = allCards.map(c => c.querySelector('img')?.src).filter(Boolean);
+    const idx = Math.max(0, allCards.indexOf(card));
+    openLightbox(srcs, idx);
+  });
   card.querySelector('.image-meta').addEventListener('click', e => {
     e.stopPropagation();
     void showImageDetail(card.dataset.recId);
@@ -2157,6 +2202,7 @@ async function finishAsyncTask(taskId, poll, data, prompt, compression, usage) {
       count:       storedImages.length,
       images:      storedImages,
       usage:       usage || null,
+      batchId:     stored?.batchId || null,
     };
   const saved = await saveRecord(rec);
   if (!saved) {
@@ -2341,7 +2387,7 @@ function bindHistoryGalleryCards(body, records, srcMap) {
 
     card.querySelector('.hist-use-config').addEventListener('click', e => {
       e.stopPropagation();
-      void useConfig(recId);
+      void useConfig(recId).then(() => closeHistoryModal());
     });
   });
 }
