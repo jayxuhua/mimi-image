@@ -1185,9 +1185,12 @@ async function deleteRecordWithAssets(recId) {
     _historyRecords = _historyRecords.filter(row => row.id !== recId);
   }
   const feed = document.getElementById('chatFeed');
-  // Revoke object URLs on all cards in this record, then remove the entire chat row
-  feed.querySelectorAll(`.image-card[data-rec-id="${recId}"]`).forEach(card => revokeCardObjectUrl(card));
-  feed.querySelectorAll(`.chat-row[data-rec-id="${recId}"]`).forEach(row => row.remove());
+  feed.querySelectorAll(`.image-card[data-rec-id="${recId}"]`).forEach(card => {
+    revokeCardObjectUrl(card);
+    const row = card.closest('.chat-row');
+    card.remove();
+    if (row && !row.querySelector('.chat-col-images')?.children.length) removeRowWithDivider(row);
+  });
   if (!feed.children.length) {
     setEmptyState(true);
     document.getElementById('tokenInfo').style.display = 'none';
@@ -1487,12 +1490,11 @@ async function deleteImageCard(card) {
   }
 
   revokeCardObjectUrl(card);
-  // Remove the card from its row; if the row's image column is now empty, remove the whole row
   const row = card.closest('.chat-row');
   card.remove();
   if (row) {
     const col = row.querySelector('.chat-col-images');
-    if (col && !col.children.length) row.remove();
+    if (col && !col.children.length) removeRowWithDivider(row);
   }
 
   const feed = document.getElementById('chatFeed');
@@ -1501,6 +1503,18 @@ async function deleteImageCard(card) {
     document.getElementById('tokenInfo').style.display = 'none';
   }
   updateToolbarBadge();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Row Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Remove a .chat-row and its preceding .chat-divider sibling (if any). */
+function removeRowWithDivider(row) {
+  if (!row) return;
+  const prev = row.previousElementSibling;
+  if (prev?.classList.contains('chat-divider')) prev.remove();
+  row.remove();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1525,14 +1539,14 @@ function createPendingCard(cardId, taskId, size, channel) {
     </div>
     <div class="pending-track"><div class="pending-bar" id="pb-${cardId}" style="width:0%"></div></div>
     <div class="pending-footer">
-      <span class="pending-meta">${size} · ${chName}</span>
-      <button class="pending-cancel-btn" data-task-id="${taskId}">取消</button>
+      <span class="pending-meta">${size.toLocaleUpperCase()} · ${chName}</span>
+      <button class="pending-cancel-btn" data-task-id="${taskId}">暂停</button>
     </div>`;
 
-  card.querySelector('.pending-cancel-btn').addEventListener('click', e => {
+  card.querySelector('.pending-cancel-btn').onclick = e => {
     e.stopPropagation();
-    cancelPendingTask(taskId);
-  });
+    pausePendingTask(taskId);
+  };
 
   return card;
 }
@@ -1627,6 +1641,7 @@ function resolvePendingCard(cardId, taskId, displayImages, fmt, size, recId, cha
 
   displayImages.forEach((item, i) => {
     const card = buildImageCard(item.src, item.ref, fmt, size, sw, sh, cw, recId, channel, i, item.objectUrl || '');
+    card.style.animation = 'cardAppear 0.22s ease forwards';
     frag.appendChild(card);
   });
 
@@ -1636,39 +1651,78 @@ function resolvePendingCard(cardId, taskId, displayImages, fmt, size, recId, cha
   } else {
     col.appendChild(frag);
   }
-  row.dataset.recId = recId;
   updateToolbarBadge();
 }
 
-function cancelPendingTask(taskId) {
-  if (!confirm('取消此异步任务？（已提交到服务器，取消仅停止本地轮询）')) return;
+function pausePendingTask(taskId) {
   const poll = state.pendingPolls.get(taskId);
   if (poll) {
     if (poll.finalizeState === 'running') {
-      toast('结果整理中，当前无法取消，请稍候', 'info');
+      toast('结果整理中，当前无法暂停，请稍候', 'info');
       return;
     }
     clearTimeout(poll.timerId);
     removeQueuedFinalizeTask(taskId);
     state.pendingPolls.delete(taskId);
   }
-  db.deleteTask(taskId).catch(() => {});
-  markCacheSizeDirty();
+
+  // Mark as paused in DB so page refresh won't auto-resume it
+  db.getTaskById(taskId).then(task => {
+    if (task) db.saveTask({ ...task, paused: true }).catch(() => {});
+  }).catch(() => {});
+
+  const feed = document.getElementById('chatFeed');
+  const card = feed.querySelector(`[data-task-id="${taskId}"]`);
+  if (card) setPendingCardPaused(card, taskId);
+
+  updateToolbarBadge();
+  toast('已暂停，刷新页面或点击继续可恢复', 'info');
+}
+
+function setPendingCardPaused(card, taskId) {
+  const cardId = card.dataset.cardId;
+  card.classList.add('is-paused');
+  const labelEl = document.getElementById(`pl-${cardId}`);
+  if (labelEl) labelEl.textContent = '已暂停';
+  const progressEl = document.getElementById(`pp-${cardId}`);
+  if (progressEl) progressEl.textContent = '';
+  const barEl = document.getElementById(`pb-${cardId}`);
+  if (barEl) barEl.style.width = '0%';
+  const btn = card.querySelector('.pending-cancel-btn');
+  if (btn) {
+    btn.textContent = '继续';
+    btn.onclick = e => { e.stopPropagation(); resumePausedTask(taskId); };
+  }
+}
+
+async function resumePausedTask(taskId) {
+  const stored = await db.getTaskById(taskId).catch(() => null);
+  if (!stored) {
+    toast('任务记录已丢失，无法恢复', 'error');
+    return;
+  }
+
+  // Clear paused flag in DB
+  db.saveTask({ ...stored, paused: false }).catch(() => {});
+
+  const { cardId, prompt, compression } = stored;
+  registerPendingTask(taskId, cardId, 0);
 
   const feed = document.getElementById('chatFeed');
   const card = feed.querySelector(`[data-task-id="${taskId}"]`);
   if (card) {
-    const row = card.closest('.chat-row');
-    card.remove();
-    if (row) {
-      const col = row.querySelector('.chat-col-images');
-      if (col && !col.children.length) row.remove();
+    card.classList.remove('is-paused');
+    updatePendingStatus(cardId, '排队中', '', 0);
+    const btn = card.querySelector('.pending-cancel-btn');
+    if (btn) {
+      btn.textContent = '暂停';
+      btn.onclick = e => { e.stopPropagation(); pausePendingTask(taskId); };
     }
   }
 
-  if (!feed.querySelector('.image-card, .image-card-pending')) setEmptyState(true);
+  schedulePoll(taskId, prompt, compression);
   updateToolbarBadge();
-  toast('已取消轮询', 'info');
+  toast('已继续轮询', 'info');
 }
 
 /** 停止所有异步轮询（不清 DB；用于整页清理前） */
@@ -1899,10 +1953,25 @@ async function generateAsync(prompt, compression) {
   btn.disabled  = true;
   btn.innerHTML = '<div class="spinner"></div> 提交中…';
 
+  let chatRow = null;
+  let col = null;
+
   try {
-    // 异步模式单次最多 4 张，每张独立提交
     const batchN = Math.min(maxCount(), Math.max(1, state.count));
-    let submitted  = 0;
+    const batchId = genId();
+    const submittedAt = Date.now();
+
+    // Create one shared chat row for all tasks in this batch
+    chatRow = createChatRow(prompt, {
+      size:    state.size,
+      quality: state.quality,
+      format:  state.format,
+      channel: state.channel,
+      count:   batchN,
+      ts:      submittedAt,
+    });
+    col = chatRow.querySelector('.chat-col-images');
+    scrollToLatest();
 
     for (let i = 0; i < batchN; i++) {
       const body = {
@@ -1935,31 +2004,16 @@ async function generateAsync(prompt, compression) {
       if (!taskId) throw new Error('未返回任务 ID');
 
       const cardId = genId();
-      const submittedAt = Date.now();
-
       registerPendingTask(taskId, cardId, 0);
 
-      // 每个异步任务创建独立的对话行
-      const chatRow = createChatRow(prompt, {
-        size:    state.size,
-        quality: state.quality,
-        format:  state.format,
-        channel: state.channel,
-        count:   1,
-        ts:      submittedAt,
-      });
-      const col = chatRow.querySelector('.chat-col-images');
       const card = createPendingCard(cardId, taskId, state.size, state.channel);
       col.appendChild(card);
       updatePendingStatus(cardId, '排队中', '');
-      scrollToLatest();
-      submitted++;
-
-      updateToolbarBadge();
 
       await db.saveTask({
         taskId,
         cardId,
+        batchId,
         channel: state.channel,
         prompt,
         compression,
@@ -1977,16 +2031,16 @@ async function generateAsync(prompt, compression) {
       schedulePoll(taskId, prompt, compression);
     }
 
-    if (submitted) {
-      toast(
-        submitted > 1
-          ? `已提交 ${submitted} 个异步任务，后台轮询中…`
-          : '任务已提交，后台轮询中…',
-        'info',
-      );
-      document.getElementById('toolbarTitle').textContent = '异步任务处理中…';
-    }
+    updateToolbarBadge();
+    toast(
+      batchN > 1
+        ? `已提交 ${batchN} 个异步任务，后台轮询中…`
+        : '任务已提交，后台轮询中…',
+      'info',
+    );
+    document.getElementById('toolbarTitle').textContent = '异步任务处理中…';
   } catch (err) {
+    if (chatRow && !col?.children.length) removeRowWithDivider(chatRow);
     toast(err.message || '提交失败，请检查 API Key 和网络', 'error');
     console.error('[generateAsync]', err);
   } finally {
@@ -2138,7 +2192,7 @@ function failAsyncTask(taskId, poll, message) {
     card.remove();
     if (row) {
       const col = row.querySelector('.chat-col-images');
-      if (col && !col.children.length) row.remove();
+      if (col && !col.children.length) removeRowWithDivider(row);
     }
   }
 
@@ -2159,28 +2213,40 @@ async function resumePendingTasks() {
 
   toast(`发现 ${tasks.length} 个待恢复的异步任务，正在恢复…`, 'info', 4000);
 
+  // Group by batchId; tasks without batchId (legacy) each get their own group
+  const groups = new Map();
   for (const task of tasks) {
-    const { taskId, cardId, channel, prompt, compression, params } = task;
+    const key = task.batchId || task.taskId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(task);
+  }
 
-    // Register poll entry
-    registerPendingTask(taskId, cardId, 0);
+  for (const groupTasks of groups.values()) {
+    const first = groupTasks[0];
+    const { channel, prompt, params } = first;
 
-    // Create a chat row for this recovered task
     const chatRow = createChatRow(prompt || '', {
       size:    params?.size    || '1024x1536',
       quality: params?.quality || 'high',
       format:  params?.format  || 'PNG',
       channel: channel || 'cnd',
-      count:   1,
-      ts:      task.submittedAt ?? task.ts,
+      count:   groupTasks.length,
+      ts:      first.submittedAt ?? first.ts,
     });
     const col = chatRow.querySelector('.chat-col-images');
-    const card = createPendingCard(cardId, taskId, params?.size || '1024x1536', channel || 'cnd');
-    col.appendChild(card);
-    updatePendingStatus(cardId, '排队中', '');
 
-    // Start polling immediately (short delay to let UI paint)
-    setTimeout(() => doPoll(taskId, prompt, compression), 1500);
+    for (const task of groupTasks) {
+      const { taskId, cardId, compression, params: tp } = task;
+      const card = createPendingCard(cardId, taskId, tp?.size || '1024x1536', task.channel || 'cnd');
+      col.appendChild(card);
+      if (task.paused) {
+        setPendingCardPaused(card, taskId);
+      } else {
+        registerPendingTask(taskId, cardId, 0);
+        updatePendingStatus(cardId, '排队中', '');
+        setTimeout(() => doPoll(taskId, task.prompt, compression), 1500);
+      }
+    }
   }
 
   updateToolbarBadge();
