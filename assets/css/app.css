@@ -2070,8 +2070,7 @@ body {
   }
 
   .sidebar-header {
-    position: relative;
-    padding-right: 72px;
+    padding-right: 20px;
   }
 
   html,
@@ -2113,9 +2112,12 @@ body {
     -webkit-tap-highlight-color: transparent;
   }
 
-  .mobile-workbench-btn:active,
-  .mobile-sidebar-close:active {
+  .mobile-workbench-btn:active {
     transform: scale(0.97);
+  }
+
+  .mobile-sidebar-close:active {
+    transform: translateX(-50%) scale(0.97);
   }
 
   .mobile-workbench-btn::before {
@@ -2129,11 +2131,13 @@ body {
   }
 
   .mobile-sidebar-close {
-    position: absolute;
-    top: 12px;
-    right: 14px;
+    position: fixed;
+    left: 50%;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
     color: var(--text);
     z-index: 2;
+    min-width: 112px;
   }
 
   .toolbar-title {
