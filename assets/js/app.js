@@ -1116,6 +1116,30 @@ function imageMimeFromFormat(fmt) {
   }
 }
 
+async function transcodeBlobForOutput(blob, fmt, compression = 100) {
+  const targetMime = imageMimeFromFormat(fmt);
+  if (!blob || targetMime === 'image/png') return blob;
+
+  const quality = Math.max(0.01, Math.min(1, (Number(compression) || 100) / 100));
+  let bitmap = null;
+  try {
+    bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return blob;
+    ctx.drawImage(bitmap, 0, 0);
+    const out = await new Promise(resolve => canvas.toBlob(resolve, targetMime, quality));
+    return out || blob;
+  } catch (err) {
+    console.warn('[transcode output]', err);
+    return blob;
+  } finally {
+    try { bitmap?.close?.(); } catch (_) { /* ignore */ }
+  }
+}
+
 function fileExtFromMime(mime, fallbackFmt = 'PNG') {
   const m = String(mime || '').toLowerCase();
   if (m === 'image/jpeg' || m === 'image/jpg') return 'jpg';
@@ -1866,7 +1890,9 @@ async function generateSync(prompt, compression) {
     const blobs = [];
     for (const item of images) {
       if (!item?.b64_json) continue;
-      blobs.push(base64ToBlob(item.b64_json, mime));
+      const sourceMime = item.output_format ? imageMimeFromFormat(item.output_format) : 'image/png';
+      const rawBlob = base64ToBlob(item.b64_json, sourceMime);
+      blobs.push(await transcodeBlobForOutput(rawBlob, state.format, compression));
       if (images.length > 1) await nextPaint();
     }
     const { storedImages, preparedImages } = await persistBlobImages(recId, blobs, mime);
