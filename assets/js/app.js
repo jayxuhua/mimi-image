@@ -10,6 +10,7 @@ import {
   POLL_JITTER_MAX,
   POLL_MAX,
   REF_UPLOAD_MAX_BYTES,
+  REF_UPLOAD_MAX_COUNT,
   MODAL_GALLERY_PAGE_SIZE,
   CANVAS_INITIAL_IMAGE_LIMIT,
   EYE_OPEN,
@@ -34,15 +35,16 @@ import {
   compareSemver,
 } from './utils.js';
 import db from './db.js';
+import { generateOpenAIImages } from './providers/openai-image.js';
 import Viewer from '/vendor/viewerjs/viewer.esm.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application State
 // ─────────────────────────────────────────────────────────────────────────────
 const state = {
-  channel: 'cnd',
-  asyncMode: 'async',           // 'sync' | 'async'；default 异步
-  keys: { cnd: '' },
+  channel: 'openai',
+  asyncMode: 'sync',
+  keys: { openai: '' },
   size: '2:3',
   quality: 'high',
   format: 'PNG',
@@ -52,7 +54,7 @@ const state = {
   refImages: [],
   sizeMode: 'ratio',  // 'ratio' | 'pixel'
   ratioSize: '2:3',        // last explicit ratio selection (independent of pixel mode)
-  pixelSize: '1024x1792',  // last explicit pixel selection (independent of ratio mode)
+  pixelSize: '1024x1536',  // last explicit pixel selection (independent of ratio mode)
   moderation:    false,    // CND：true = 开启 moderation 参数
   streamEnabled: false,    // CND：流式 + partial_images
   /** 与生成记录分离，内存镜像 + `kv` 持久化 */
@@ -62,7 +64,7 @@ const state = {
 
 /** 异步模式单次最多 4 张（多任务提交）；同步模式最多 10 张（n 参数） */
 function maxCount() {
-  return state.asyncMode === 'async' ? 4 : 10;
+  return 3;
 }
 
 function syncCountStepperUi() {
@@ -155,6 +157,7 @@ function setHistoryRecords(records) {
 
   // ── Sync UI ──
   syncModeButtons();
+  state.asyncMode = 'sync';
   updateKeyStatus();
   updateRefImageButton();
   clampCount();
@@ -174,8 +177,8 @@ function setHistoryRecords(records) {
 
   await maybeShowReleaseNotes();
 
-  // Resume pending async tasks (page-reload recovery)
-  await resumePendingTasks();
+  // OpenAI-only MVP does not resume legacy CND async tasks.
+  if (db.hasDb()) await db.clearPendingTasks().catch(() => {});
 
   // Final scroll after all rows (completed + pending) are in the DOM
   requestAnimationFrame(() => scrollToLatest(true));
@@ -372,6 +375,7 @@ function wireEvents() {
 // Async Mode
 // ─────────────────────────────────────────────────────────────────────────────
 async function setAsyncMode(mode, showToast = false) {
+  mode = 'sync';
   if (state.asyncMode === mode) return;
   state.asyncMode = mode;
   if (db.hasDb()) {
@@ -390,7 +394,7 @@ function syncModeButtons() {
 }
 
 function updateKeyStatus() {
-  const hasKey = !!state.keys.cnd;
+  const hasKey = !!state.keys.openai;
   const dot    = document.getElementById('keyDot');
   const btn    = document.getElementById('settingsBtn');
   dot.classList.toggle('active', hasKey);
@@ -411,13 +415,13 @@ function handleRefImageBtnClick() {
 }
 
 function openRefUploadModal() {
-  const maxRef = state.asyncMode === 'async' ? 10 : 1;
+  const maxRef = REF_UPLOAD_MAX_COUNT;
   document.getElementById('refUploadModal').classList.add('open');
   document.getElementById('refUploadInput').value = '';
   document.getElementById('refUploadZone').classList.remove('ref-upload-drag');
   const hintEl = document.querySelector('#refUploadModal .ref-upload-zone-hint');
   if (hintEl) {
-    hintEl.textContent = `JPG / JPEG / PNG，单张不超过 5MB，最多 ${maxRef} 张`;
+    hintEl.textContent = `JPG / JPEG / PNG，单张不超过 3MB，最多 ${maxRef} 张`;
   }
 }
 
@@ -551,7 +555,7 @@ function isValidRefUploadFile(file) {
     return { ok: false, reason: '仅支持 JPG、JPEG、PNG' };
   }
   if (file.size > REF_UPLOAD_MAX_BYTES) {
-    return { ok: false, reason: '单张不能超过 5MB' };
+    return { ok: false, reason: '单张不能超过 3MB' };
   }
   if (file.size <= 0) {
     return { ok: false, reason: '文件无效' };
@@ -580,7 +584,7 @@ async function processRefUploadFiles(fileList) {
   const files = Array.from(fileList).filter(f => f.size > 0);
   if (!files.length) return;
 
-  const maxRef = state.asyncMode === 'async' ? 10 : 1;
+  const maxRef = REF_UPLOAD_MAX_COUNT;
   const slots = maxRef - state.refImages.length;
   if (slots <= 0) {
     toast(`最多 ${maxRef} 张参考图`, 'info');
@@ -630,7 +634,7 @@ async function processRefUploadFiles(fileList) {
 // Settings Modal
 // ─────────────────────────────────────────────────────────────────────────────
 function openSettings() {
-  document.getElementById('modalCndKey').value = state.keys.cnd;
+  document.getElementById('modalCndKey').value = state.keys.openai;
   void updateCacheSize();
   document.getElementById('settingsModal').classList.add('open');
   setTimeout(() => document.getElementById('modalCndKey')?.focus(), 60);
@@ -645,12 +649,12 @@ async function saveSettings() {
     toast('IndexedDB 不可用，无法保存设置', 'error');
     return;
   }
-  const cndKey = document.getElementById('modalCndKey').value.trim();
-  state.keys.cnd = cndKey;
+  const openaiKey = document.getElementById('modalCndKey').value.trim();
+  state.keys.openai = openaiKey;
 
   try {
-    if (cndKey) await db.kvSet(CHANNEL.cnd.lsKey, cndKey);
-    else await db.kvRemove(CHANNEL.cnd.lsKey);
+    if (openaiKey) await db.kvSet(CHANNEL.openai.lsKey, openaiKey);
+    else await db.kvRemove(CHANNEL.openai.lsKey);
   } catch (e) {
     toast(e.message || '设置保存失败', 'error');
     return;
@@ -662,9 +666,9 @@ async function saveSettings() {
 }
 
 async function clearCurrentKey() {
-  if (!confirm('确定清除 CND 的 API Key？')) return;
-  state.keys.cnd = '';
-  if (db.hasDb()) await db.kvRemove(CHANNEL.cnd.lsKey);
+  if (!confirm('确定清除 OpenAI API Key？')) return;
+  state.keys.openai = '';
+  if (db.hasDb()) await db.kvRemove(CHANNEL.openai.lsKey);
   const el = document.getElementById('modalCndKey');
   if (el) el.value = '';
   updateKeyStatus();
@@ -960,7 +964,7 @@ function friendlyTime(ts) {
 
 function buildParamsBubble(prompt, params) {
   const { size, quality, format, channel, count } = params;
-  const chDef   = CHANNEL[channel] || CHANNEL.cnd;
+  const chDef   = CHANNEL[channel] || CHANNEL.openai;
   const chClass = 'ch-cnd';
 
   const tags = [
@@ -1386,7 +1390,7 @@ async function loadRecordsToCanvas() {
       size:    first.size,
       quality: first.quality,
       format:  first.format,
-      channel: first.channel || 'cnd',
+      channel: first.channel || 'openai',
       count:   totalImages,
       ts:      first.ts,
     });
@@ -1404,7 +1408,7 @@ async function loadRecordsToCanvas() {
   document.getElementById('toolbarTitle').textContent =
     rendered >= CANVAS_INITIAL_IMAGE_LIMIT
       ? `最近记录（仅显示最近 ${rendered} 张）`
-      : 'CND AI Image Generator Workspace';
+      : '咪咪Image创意工作台';
   updateCumulativeTokens();
 
   requestAnimationFrame(() => scrollToLatest(true));
@@ -1445,7 +1449,7 @@ function renderImagesInRow(row, displayImages, fmt, size, recId, channel, usage)
 async function renderStoredRecordImages(rec, row) {
   const displayImages = await materializeStoredImages(rec.images, rec.format);
   if (!displayImages.length) return;
-  renderImagesInRow(row, displayImages, rec.format, rec.size, rec.id, rec.channel || 'cnd', null);
+  renderImagesInRow(row, displayImages, rec.format, rec.size, rec.id, rec.channel || 'openai', null);
 }
 
 function buildImageCard(src, imageRef, fmt, size, sw, sh, cw, recId, channel, idx, objectUrl = '') {
@@ -1457,7 +1461,7 @@ function buildImageCard(src, imageRef, fmt, size, sw, sh, cw, recId, channel, id
   if (objectUrl) card.dataset.objectUrl = objectUrl;
 
   // Channel tag label & class
-  const chDef  = CHANNEL[channel] || CHANNEL.cnd;
+  const chDef  = CHANNEL[channel] || CHANNEL.openai;
   const tagCls = '';
 
   card.innerHTML = `
@@ -1788,18 +1792,16 @@ async function generate() {
   const prompt      = document.getElementById('prompt').value.trim();
   const compression = parseInt(document.getElementById('compression').value);
 
-  if (!state.keys.cnd) {
+  state.asyncMode = 'sync';
+
+  if (!state.keys.openai) {
     toast('请先在设置中配置 API Key', 'error');
     openSettings();
     return;
   }
   if (!prompt) { toast('请输入描述词', 'error'); return; }
 
-  if (state.asyncMode === 'async') {
-    await generateAsync(prompt, compression);
-  } else {
-    await generateSync(prompt, compression);
-  }
+  await generateSync(prompt, compression);
 }
 
 /** CND 渠道将比例字符串转换为 API 所需像素尺寸 */
@@ -1813,7 +1815,6 @@ function resolveSizeForChannel(size, channelId) {
 // Sync Generation (CND 同步)
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateSync(prompt, compression) {
-  const ch  = CHANNEL.cnd;
   const btn = document.getElementById('genBtn');
 
   state.loading = true;
@@ -1835,57 +1836,28 @@ async function generateSync(prompt, compression) {
   scrollToLatest();
 
   try {
-    const fmt  = state.format.toUpperCase();
-    const body = {
-      model:         'gpt-image-2',
+    const result = await generateOpenAIImages({
+      apiKey: state.keys.openai,
       prompt,
-      size:          resolveSizeForChannel(state.size, state.channel),
-      quality:       state.quality,
-      output_format: fmt,
-      n:             state.count,
-    };
-    // 仅 JPEG/WEBP 发 compression
-    if (fmt === 'JPEG' || fmt === 'WEBP') {
-      body.output_compression = compression;
-    }
-    // 实验性参数
-    if (state.moderation) body.moderation = 'low';
-    if (state.streamEnabled) {
-      body.stream        = true;
-      body.partial_images = 2;
-    }
-
-    // 同步模式：参考图用 image_url（仅支持单张）
-    if (state.refImages.length) {
-      body.image_url = state.refImages[0].url;
-    }
-
-    const res  = await fetch(ch.endpoint, {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${state.keys.cnd}`,
-      },
-      body: JSON.stringify(body),
+      size: state.size,
+      quality: state.quality,
+      format: state.format,
+      compression,
+      count: state.count,
+      refImages: state.refImages,
     });
-
-    let json;
-    if (state.streamEnabled && (res.headers.get('content-type') || '').includes('text/event-stream')) {
-      json = await parseStreamResponse(res);
-    } else {
-      json = await res.json();
-      if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
-    }
+    const json = result.raw;
+    const images = result.images;
 
     hideSkeletonInRow(chatRow);
 
     const recId = genId();
     const mime = imageMimeFromFormat(state.format);
     const blobs = [];
-    for (const item of json.data || []) {
+    for (const item of images) {
       if (!item?.b64_json) continue;
       blobs.push(base64ToBlob(item.b64_json, mime));
-      if ((json.data || []).length > 1) await nextPaint();
+      if (images.length > 1) await nextPaint();
     }
     const { storedImages, preparedImages } = await persistBlobImages(recId, blobs, mime);
     const rec   = {
@@ -1913,7 +1885,7 @@ async function generateSync(prompt, compression) {
 
     document.getElementById('emptyState').style.display    = 'none';
     document.getElementById('toolbarTitle').textContent     = '生成完成';
-    toast(`成功生成 ${json.data.length} 张图像`, 'success');
+    toast(`成功生成 ${images.length} 张图像`, 'success');
     scrollToLatest();
 
   } catch (err) {
@@ -1992,7 +1964,7 @@ function updateSkeletonWithPartial(index, b64) {
 // Async Generation (CND 异步)
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateAsync(prompt, compression) {
-  const ch  = CHANNEL.cnd;
+  const ch  = CHANNEL.openai;
   const btn = document.getElementById('genBtn');
 
   btn.disabled  = true;
@@ -2020,7 +1992,7 @@ async function generateAsync(prompt, compression) {
 
     for (let i = 0; i < batchN; i++) {
       const body = {
-        model:   'gpt-image-v2',
+        model:   CHANNEL.openai.defaultModel,
         prompt,
         size:    state.size,
         quality: state.quality,
@@ -2037,7 +2009,7 @@ async function generateAsync(prompt, compression) {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': `Bearer ${state.keys.cnd}`,
+          'Authorization': `Bearer ${state.keys.openai}`,
         },
         body: JSON.stringify(body),
       });
@@ -2110,11 +2082,11 @@ async function doPoll(taskId, prompt, compression) {
   if (!poll) return;   // task was cancelled
 
   poll.attempts++;
-  const ch = CHANNEL.cnd;
+  const ch = CHANNEL.openai;
 
   try {
     const res  = await fetch(`${ch.asyncPollBase}${taskId}`, {
-      headers: { 'Authorization': `Bearer ${state.keys.cnd}` },
+      headers: { 'Authorization': `Bearer ${state.keys.openai}` },
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
@@ -2193,7 +2165,7 @@ async function finishAsyncTask(taskId, poll, data, prompt, compression, usage) {
   const rec   = {
       id:          recId,
       ts:          Date.now(),
-      channel:     'cnd',
+      channel:     'openai',
       prompt:      stored?.prompt || prompt,
       size:        params.size,
       quality:     params.quality,
@@ -2211,7 +2183,7 @@ async function finishAsyncTask(taskId, poll, data, prompt, compression, usage) {
     throw new Error('本地记录保存失败');
   }
 
-  resolvePendingCard(poll.cardId, taskId, preparedImages, params.format, params.size, recId, 'cnd');
+  resolvePendingCard(poll.cardId, taskId, preparedImages, params.format, params.size, recId, 'openai');
   await accumulateUsageStats(usage);
 
   // Clean up
@@ -2275,7 +2247,7 @@ async function resumePendingTasks() {
       size:    params?.size    || '1024x1536',
       quality: params?.quality || 'high',
       format:  params?.format  || 'PNG',
-      channel: channel || 'cnd',
+      channel: channel || 'openai',
       count:   groupTasks.length,
       ts:      first.submittedAt ?? first.ts,
     });
@@ -2283,7 +2255,7 @@ async function resumePendingTasks() {
 
     for (const task of groupTasks) {
       const { taskId, cardId, compression, params: tp } = task;
-      const card = createPendingCard(cardId, taskId, tp?.size || '1024x1536', task.channel || 'cnd');
+      const card = createPendingCard(cardId, taskId, tp?.size || '1024x1536', task.channel || 'openai');
       col.appendChild(card);
       if (task.paused) {
         setPendingCardPaused(card, taskId);
@@ -2612,7 +2584,7 @@ async function showImageDetail(recId) {
       ${row('生成质量', esc(rec.quality))}
       ${row('输出格式', esc(rec.format))}
       ${row('压缩级别', rec.compression ?? '—')}
-      ${row('渠道', esc(CHANNEL[rec.channel]?.name || rec.channel || 'CND'))}
+      ${row('渠道', esc(CHANNEL[rec.channel]?.name || rec.channel || 'OpenAI'))}
     </div>`;
 
   // Usage — only render if present and has at least one valid value

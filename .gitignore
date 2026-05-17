@@ -1,2 +1,6 @@
-.claude/settings.local.json
-v2
+.claude/
+.env
+.DS_Store
+node_modules/
+uploads/*
+!uploads/.gitignore

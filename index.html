@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CND Image 创意工作台 - GPT Image 2</title>
+  <title>咪咪Image创意工作台</title>
   <meta name="author" content="EllisFan<ellisfan07@gmail.com>">
-  <meta name="keywords" content="CND Image,创意工作台,GPT Image 2,图像生成,AI创意工作台">
-  <meta name="description" content="CND Image 创意工作台，支持GPT Image 2图像生成">
-  <link rel="icon" href="assets/images/logo.png">
+  <meta name="keywords" content="咪咪Image,创意工作台,图像生成,AI创意工作台">
+  <meta name="description" content="咪咪Image创意工作台，支持 AI 图像生成">
+  <link rel="icon" type="image/png" href="assets/images/logo.png?v=20260517">
+  <link rel="shortcut icon" type="image/png" href="assets/images/logo.png?v=20260517">
   <link rel="stylesheet" href="vendor/viewerjs/viewer.min.css">
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
@@ -18,9 +19,9 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo">
-          <div class="logo-icon" onclick="window.location.href='https://cnd.cool'"><img src="assets/images/logo.png" alt="CND Image"></div>
+          <div class="logo-icon"><img src="assets/images/logo.png" alt="咪咪Image创意工作台"></div>
           <div>
-            <div class="logo-text">CND Image</div>
+            <div class="logo-text">咪咪Image</div>
             <div class="logo-sub">AI·创意工作台</div>
           </div>
           <span class="key-dot" id="keyDot" title="API Key 未配置"></span>
@@ -46,8 +47,7 @@
         <div class="section">
           <div class="section-label">生图模式</div>
           <div class="seg" id="asyncModeSeg">
-            <button class="seg-btn" data-async-mode="sync">同步生图</button>
-            <button class="seg-btn active" data-async-mode="async">✦ 异步生图(推荐)</button>
+            <button class="seg-btn active" data-async-mode="sync">Image2 生图</button>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
         <div class="section">
           <div class="section-label">画面比例</div>
 
-          <!-- CND 渠道：比例 chip 网格 + 像素预设 + 自定义尺寸 -->
+          <!-- OpenAI 尺寸：比例 chip 网格 + 像素预设 + 自定义尺寸 -->
           <div id="sizeSection" style="display:none;">
             <!-- 比例 / 像素 模式切换 -->
             <div class="seg" id="sizeModeSeg" style="margin-bottom:10px;">
@@ -157,6 +157,9 @@
             <button class="seg-btn" data-q="low">低</button>
             <button class="seg-btn" data-q="medium">中</button>
             <button class="seg-btn active" data-q="high">高</button>
+          </div>
+          <div class="modal-note" style="margin-top:6px;">
+            低质量影响生成细节，不等同于更小文件；如需减小体积，建议输出 JPEG/WEBP 并调低压缩质量。
           </div>
         </div>
 
@@ -256,10 +259,10 @@
       <div style="padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;">
         <p style="font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6;">
           © 2026
-          <a href="https://api.cnd.cool/register?aff=O3iX" target="_blank" rel="noopener"
+          <a href="https://tokenstation.top" target="_blank" rel="noopener"
             style="color:var(--text-muted);text-decoration:none;transition:color .15s;"
             onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--text-muted)'">
-            CND
+            咪咪Image
           </a>
           · Powered by <a href="https://github.com/ellisfan/cnd-image" target="_blank" rel="noopener"
             style="color:var(--text-muted);text-decoration:none;transition:color .15s;"
@@ -307,11 +310,11 @@
       </div>
       <div class="modal-body">
 
-        <!-- CND Key -->
+        <!-- OpenAI Key -->
         <div id="cndKeySection">
           <div class="modal-field-label" style="display:flex;align-items:center;justify-content:space-between;">
-            CND API Key
-            <a href="https://api.cnd.cool/register?aff=O3iX" target="_blank" rel="noopener" class="modal-link">
+            API Key
+            <a href="https://tokenstation.top" target="_blank" rel="noopener" class="modal-link">
               获取 API Key →
             </a>
           </div>
@@ -346,7 +349,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-ghost danger" id="clearKeyBtn">清除当前渠道 Key</button>
+        <button class="btn-ghost danger" id="clearKeyBtn">清除 API Key</button>
         <button class="btn-ghost" id="cancelSettingsBtn">取消</button>
         <button class="btn-primary" id="saveSettingsBtn">保存</button>
       </div>
@@ -436,7 +439,7 @@
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             <span class="ref-upload-zone-title">点击或拖拽图片到此处</span>
-            <span class="ref-upload-zone-hint">JPG / JPEG / PNG，单张不超过 5MB，最多 10 张</span>
+            <span class="ref-upload-zone-hint">JPG / JPEG / PNG，单张不超过 3MB，最多 2 张</span>
           </div>
           <div class="ref-upload-zone-busy" id="refUploadBusy" style="display:none;">上传中…</div>
         </label>

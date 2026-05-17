@@ -1,7 +1,7 @@
 <?php
 /**
  * 参考图上传：保存到 uploads 目录，返回公网可访问 URL（JSON）。
- * 安全策略：仅 POST、5MB 上限、白名单 MIME + 魔数校验、随机文件名。
+ * 安全策略：仅 POST、3MB 上限、白名单 MIME + 魔数校验、随机文件名。
  *
  * @author EllisFan<ellisfan07@gmail.com>
  * @date 2026-05-10
@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_MIME = [
     'image/jpeg' => 'jpg',
     'image/png'  => 'png',
@@ -47,7 +47,7 @@ if ($err !== UPLOAD_ERR_OK) {
 
 $size = (int) ($f['size'] ?? 0);
 if ($size <= 0 || $size > MAX_BYTES) {
-    json_fail('文件大小须大于 0 且不超过 5MB');
+    json_fail('文件大小须大于 0 且不超过 3MB');
 }
 
 $tmp = (string) ($f['tmp_name'] ?? '');

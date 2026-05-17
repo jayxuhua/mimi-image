@@ -249,6 +249,10 @@ async function hydrateState(state, CHANNEL) {
     const v = await kvGet(ch.lsKey);
     if (v) state.keys[ch.id] = v;
   }
+  if (!state.keys.openai) {
+    const oldCndKey = await kvGet('cnd_ai_cnd_key');
+    if (oldCndKey) state.keys.openai = oldCndKey;
+  }
 
   const uRaw = await kvGet(KV_USAGE_STATS);
   try {
