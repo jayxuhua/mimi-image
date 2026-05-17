@@ -552,6 +552,7 @@ async function maybeShowReleaseNotes() {
     return;
   }
   const url = new URL(RELEASE_JSON_PATH, window.location.href);
+  url.searchParams.set('v', VERSION);
   url.searchParams.set('_', String(Date.now()));
   let data;
   try {
