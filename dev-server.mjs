@@ -83,7 +83,11 @@ async function handleImageProxy(req, res) {
     return sendJson(res, 401, { error: { message: 'Missing API Key' } });
   }
   const body = await readBody(req);
-  const upstream = await fetch('https://tokenstation.top/v1/images/generations', {
+  const url = new URL(req.url || '/', `http://localhost:${port}`);
+  const upstreamPath = url.searchParams.get('mode') === 'edit'
+    ? 'https://tokenstation.top/v1/images/edits'
+    : 'https://tokenstation.top/v1/images/generations';
+  const upstream = await fetch(upstreamPath, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

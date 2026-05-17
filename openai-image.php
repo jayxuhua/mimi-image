@@ -38,7 +38,9 @@ $allowed = [
     'output_format',
     'output_compression',
     'n',
-    'image',
+    'images',
+    'mask',
+    'input_fidelity',
 ];
 $body = [];
 foreach ($allowed as $key) {
@@ -54,7 +56,12 @@ if ($jsonBody === false) {
     exit;
 }
 
-$ch = curl_init('https://tokenstation.top/v1/images/generations');
+$mode = strtolower((string) ($_GET['mode'] ?? ''));
+$endpoint = $mode === 'edit'
+    ? 'https://tokenstation.top/v1/images/edits'
+    : 'https://tokenstation.top/v1/images/generations';
+
+$ch = curl_init($endpoint);
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_RETURNTRANSFER => true,

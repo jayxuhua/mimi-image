@@ -580,6 +580,15 @@ async function uploadRefFileToServer(file) {
   return json.url;
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('读取参考图失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function processRefUploadFiles(fileList) {
   const files = Array.from(fileList).filter(f => f.size > 0);
   if (!files.length) return;
@@ -613,8 +622,9 @@ async function processRefUploadFiles(fileList) {
     for (const file of validFiles) {
       if (state.refImages.length >= maxRef) break;
       try {
+        const dataUrl = await readFileAsDataUrl(file);
         const url = await uploadRefFileToServer(file);
-        state.refImages.push({ name: file.name, url });
+        state.refImages.push({ name: file.name, url, dataUrl });
         renderRefImages();
         added++;
       } catch (err) {

@@ -25,8 +25,9 @@ function mergeUsage(a, b) {
   return out;
 }
 
-async function postImageRequest({ ch, apiKey, body }) {
-  const res = await fetch(ch.endpoint, {
+async function postImageRequest({ ch, apiKey, body, editMode = false }) {
+  const url = editMode ? `${ch.endpoint}?mode=edit` : ch.endpoint;
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -55,12 +56,17 @@ export async function generateOpenAIImages({
   const ch = CHANNEL.openai;
   const outputFormat = String(format || 'PNG').toLowerCase();
   const totalCount = Math.max(1, Math.min(3, Number(count) || 1));
+  const refs = Array.isArray(refImages)
+    ? refImages.map(r => r?.dataUrl || r?.url || r).filter(Boolean)
+    : [];
+  const editMode = refs.length > 0;
   const body = {
     model: ch.defaultModel,
     prompt,
     size: resolveOpenAIImageSize(size),
     quality: normalizeOpenAIQuality(quality),
     output_format: outputFormat,
+    response_format: 'b64_json',
     n: 1,
   };
 
@@ -68,20 +74,16 @@ export async function generateOpenAIImages({
     body.output_compression = Math.max(0, Math.min(100, Number(compression)));
   }
 
-  const refs = Array.isArray(refImages)
-    ? refImages.map(r => r?.url || r).filter(Boolean)
-    : [];
-  if (refs.length === 1) {
-    body.image = refs[0];
-  } else if (refs.length > 1) {
-    body.image = refs;
+  if (editMode) {
+    body.images = refs.map(imageUrl => ({ image_url: imageUrl }));
+    body.input_fidelity = 'high';
   }
 
   const allImages = [];
   let usage = null;
   let lastRaw = null;
   for (let i = 0; i < totalCount; i++) {
-    const json = await postImageRequest({ ch, apiKey, body });
+    const json = await postImageRequest({ ch, apiKey, body, editMode });
     lastRaw = json;
     const images = Array.isArray(json.data) ? json.data : [];
     allImages.push(...images);
