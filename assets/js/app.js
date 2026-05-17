@@ -106,10 +106,17 @@ function nextPaint() {
 
 function setMobileWorkbenchOpen(open) {
   const app = document.querySelector('.app');
+  const sidebar = document.getElementById('sidebar');
   const btn = document.getElementById('mobileWorkbenchBtn');
   if (!app) return;
   app.classList.toggle('sidebar-open', !!open);
+  sidebar?.classList.toggle('is-open', !!open);
   if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function toggleMobileWorkbench() {
+  const app = document.querySelector('.app');
+  setMobileWorkbenchOpen(!app?.classList.contains('sidebar-open'));
 }
 
 function closeMobileWorkbench() {
@@ -339,8 +346,12 @@ function wireEvents() {
   // Toolbar
   document.getElementById('clearBtn').addEventListener('click', clearCanvas);
   document.getElementById('toolbarBadge').addEventListener('click', openHistoryModal);
-  document.getElementById('mobileWorkbenchBtn')?.addEventListener('click', () => setMobileWorkbenchOpen(true));
-  document.getElementById('mobileSidebarCloseBtn')?.addEventListener('click', closeMobileWorkbench);
+  document.getElementById('mobileWorkbenchBtn')?.addEventListener('click', toggleMobileWorkbench);
+  document.getElementById('mobileSidebarCloseBtn')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMobileWorkbench();
+  });
   document.querySelector('.app')?.addEventListener('click', e => {
     if (e.target === e.currentTarget && e.currentTarget.classList.contains('sidebar-open')) {
       closeMobileWorkbench();
@@ -494,7 +505,7 @@ function renderReleaseNotesModal(entry) {
   const heading = document.getElementById('releaseNotesHeading');
   const meta = document.getElementById('releaseNotesMeta');
   const list = document.getElementById('releaseNotesList');
-  heading.textContent = '版本更新';
+  heading.textContent = '通知|公告|教程|更新';
   const time = entry.update_time ? esc(String(entry.update_time)) : '';
   meta.innerHTML = time
     ? `<span class="release-notes-ver">v${esc(entry.version)}</span><span class="release-notes-time">${time}</span>`

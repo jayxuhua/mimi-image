@@ -2048,23 +2048,25 @@ body {
     position: fixed;
     top: 0;
     bottom: 0;
-    left: -100%;
+    left: 0;
     z-index: 30;
     width: min(92vw, 360px);
     height: 100dvh;
     border-right: 1px solid var(--border);
     border-bottom: none;
     box-shadow: 18px 0 40px rgba(0, 0, 0, 0.36);
-    transition: left 0.2s ease;
-    will-change: left;
+    transform: translate3d(-105%, 0, 0);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform;
   }
 
   .sidebar-scroll {
     max-height: none;
   }
 
-  .app.sidebar-open .sidebar {
-    left: 0;
+  .app.sidebar-open .sidebar,
+  .sidebar.is-open {
+    transform: translate3d(0, 0, 0) !important;
   }
 
   .sidebar-header {
@@ -2082,9 +2084,12 @@ body {
   }
 
   .canvas-toolbar {
-    height: 50px;
-    padding: 0 12px;
-    gap: 8px;
+    height: 54px;
+    padding: 0 14px;
+    gap: 10px;
+    background: rgba(24, 24, 28, 0.86);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .mobile-workbench-btn,
@@ -2092,22 +2097,43 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface2);
-    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+    color: #f7f7fb;
     font-size: 12px;
-    height: 32px;
-    padding: 0 10px;
+    font-weight: 600;
+    height: 34px;
+    padding: 0 13px;
     cursor: pointer;
     flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px rgba(0, 0, 0, 0.26);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-workbench-btn:active,
+  .mobile-sidebar-close:active {
+    transform: scale(0.97);
+  }
+
+  .mobile-workbench-btn::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-right: 7px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
   }
 
   .mobile-sidebar-close {
     position: absolute;
-    top: 14px;
+    top: 12px;
     right: 14px;
-    color: var(--text-muted);
+    color: var(--text);
+    z-index: 2;
   }
 
   .toolbar-title {
@@ -2124,7 +2150,7 @@ body {
 
   .canvas-body {
     min-height: 0;
-    height: calc(100dvh - 50px);
+    height: calc(100dvh - 54px);
   }
 
   .app.sidebar-open::after {
