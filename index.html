@@ -16,8 +16,9 @@
   <div class="app">
 
     <!-- ── Sidebar ── -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
+        <button class="mobile-sidebar-close" id="mobileSidebarCloseBtn" type="button" title="收起工作台" aria-label="收起工作台">收起</button>
         <div class="logo">
           <div class="logo-icon"><img src="assets/images/logo.png" alt="咪咪Image创意工作台"></div>
           <div>
@@ -274,6 +275,7 @@
     <!-- ── Canvas ── -->
     <main class="canvas">
       <div class="canvas-toolbar">
+        <button class="mobile-workbench-btn" id="mobileWorkbenchBtn" type="button" aria-expanded="false" aria-controls="sidebar">工作台</button>
         <span class="toolbar-title" id="toolbarTitle">等待生成…</span>
         <span class="toolbar-badge" id="toolbarBadge" style="display:none"></span>
         <button class="toolbar-btn" id="clearBtn" style="display:none">清空画布</button>

@@ -104,6 +104,18 @@ function nextPaint() {
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
+function setMobileWorkbenchOpen(open) {
+  const app = document.querySelector('.app');
+  const btn = document.getElementById('mobileWorkbenchBtn');
+  if (!app) return;
+  app.classList.toggle('sidebar-open', !!open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function closeMobileWorkbench() {
+  setMobileWorkbenchOpen(false);
+}
+
 function resetHistoryModalObjectUrls() {
   _historyModalObjectUrls.forEach(revokeObjectUrl);
   _historyModalObjectUrls = [];
@@ -327,6 +339,13 @@ function wireEvents() {
   // Toolbar
   document.getElementById('clearBtn').addEventListener('click', clearCanvas);
   document.getElementById('toolbarBadge').addEventListener('click', openHistoryModal);
+  document.getElementById('mobileWorkbenchBtn')?.addEventListener('click', () => setMobileWorkbenchOpen(true));
+  document.getElementById('mobileSidebarCloseBtn')?.addEventListener('click', closeMobileWorkbench);
+  document.querySelector('.app')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget && e.currentTarget.classList.contains('sidebar-open')) {
+      closeMobileWorkbench();
+    }
+  });
 
   // Detail modal
   document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
@@ -350,6 +369,7 @@ function wireEvents() {
     closeExamplesModal();
     closeHistoryModal();
     closeRefUploadModal();
+    closeMobileWorkbench();
     void dismissReleaseNotesModal();
   });
 
@@ -1835,6 +1855,7 @@ async function generate() {
   }
   if (!prompt) { toast('请输入描述词', 'error'); return; }
 
+  closeMobileWorkbench();
   await generateSync(prompt, compression);
 }
 
