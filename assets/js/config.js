@@ -1,4 +1,4 @@
-export const VERSION = '1.0.2-openai';
+export const VERSION = '1.0.3-openai';
 
 export const KV_ASYNC_MODE = 'cnd_ai_async_mode';
 export const KV_USAGE_STATS = 'cnd_ai_usage_stats';
@@ -26,9 +26,9 @@ export const CHANNEL = {
     id: 'openai',
     name: '咪咪Image',
     supportsRef: true,
-    endpoint: 'openai-image.php',
-    asyncEndpoint: 'openai-image-task.php',
-    asyncPollBase: 'openai-image-task.php?id=',
+    endpoint: '/openai-image.php',
+    asyncEndpoint: '/openai-image-task.php',
+    asyncPollBase: '/openai-image-task.php?id=',
     lsKey: 'oneday_openai_key',
     label: 'OpenAI API Key',
     link: 'https://tokenstation.top',

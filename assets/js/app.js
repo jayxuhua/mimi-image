@@ -2080,7 +2080,7 @@ async function generateAsync(prompt, compression) {
         body: JSON.stringify(body),
       });
 
-      const json = await readJsonResponse(res, '异步任务提交');
+      const json = await readJsonResponse(res, `异步任务提交 ${taskUrl}`);
       if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
 
       const taskId = json.id;
