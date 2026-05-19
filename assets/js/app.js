@@ -176,7 +176,6 @@ function setHistoryRecords(records) {
 
   // ── Sync UI ──
   syncModeButtons();
-  state.asyncMode = 'sync';
   updateKeyStatus();
   updateRefImageButton();
   clampCount();
@@ -405,7 +404,7 @@ function wireEvents() {
 // Async Mode
 // ─────────────────────────────────────────────────────────────────────────────
 async function setAsyncMode(mode, showToast = false) {
-  mode = 'sync';
+  mode = mode === 'async' ? 'async' : 'sync';
   if (state.asyncMode === mode) return;
   state.asyncMode = mode;
   if (db.hasDb()) {
