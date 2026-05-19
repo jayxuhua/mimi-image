@@ -104,6 +104,18 @@ function nextPaint() {
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
+async function readJsonResponse(res, label = '接口') {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(`${label}返回为空（HTTP ${res.status}）`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`${label}返回不是有效 JSON：${text.slice(0, 160)}`);
+  }
+}
+
 function setMobileWorkbenchOpen(open) {
   const app = document.querySelector('.app');
   const sidebar = document.getElementById('sidebar');
@@ -2068,7 +2080,7 @@ async function generateAsync(prompt, compression) {
         body: JSON.stringify(body),
       });
 
-      const json = await res.json();
+      const json = await readJsonResponse(res, '异步任务提交');
       if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
 
       const taskId = json.id;
@@ -2142,7 +2154,7 @@ async function doPoll(taskId, prompt, compression) {
     const res  = await fetch(`${ch.asyncPollBase}${taskId}`, {
       headers: { 'Authorization': `Bearer ${state.keys.openai}` },
     });
-    const json = await res.json();
+    const json = await readJsonResponse(res, '异步任务查询');
     if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
 
     // Async task response: { status: "queued"|"running"|"completed"|"failed", data: [...] }
