@@ -2186,7 +2186,7 @@ async function doPoll(taskId, prompt, compression) {
       queueAsyncFinalizeTask(taskId, prompt, compression, data, json.usage || null);
 
     } else if (status === 'failed') {
-      throw new Error('任务处理失败');
+      throw new Error(json?.error?.message || '任务处理失败');
 
     } else {
       // unknown — keep polling
