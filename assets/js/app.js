@@ -35,7 +35,7 @@ import {
   compareSemver,
 } from './utils.js';
 import db from './db.js';
-import { generateOpenAIImages } from './providers/openai-image.js';
+import { generateOpenAIImages, resolveOpenAIImageSize } from './providers/openai-image.js';
 import Viewer from '/vendor/viewerjs/viewer.esm.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2066,7 +2066,7 @@ async function generateAsync(prompt, compression) {
       const body = {
         model:   CHANNEL.openai.defaultModel,
         prompt,
-        size:    state.size,
+        size:    resolveOpenAIImageSize(state.size),
         quality: state.quality,
         output_format: String(state.format || 'PNG').toLowerCase(),
         response_format: 'b64_json',
