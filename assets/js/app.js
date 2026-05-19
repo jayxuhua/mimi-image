@@ -104,6 +104,15 @@ function nextPaint() {
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
+function asyncTaskEndpoint() {
+  return CHANNEL.openai.asyncEndpoint || '/openai-image-task.php';
+}
+
+function asyncTaskPollUrl(taskId) {
+  const base = CHANNEL.openai.asyncPollBase || '/openai-image-task.php?id=';
+  return `${base}${encodeURIComponent(taskId)}`;
+}
+
 async function readJsonResponse(res, label = '接口') {
   const text = await res.text();
   if (!text.trim()) {
@@ -2070,7 +2079,8 @@ async function generateAsync(prompt, compression) {
         body.input_fidelity = 'high';
       }
 
-      const taskUrl = state.refImages.length ? `${ch.asyncEndpoint}?mode=edit` : ch.asyncEndpoint;
+      const endpoint = asyncTaskEndpoint();
+      const taskUrl = state.refImages.length ? `${endpoint}?mode=edit` : endpoint;
       const res  = await fetch(taskUrl, {
         method:  'POST',
         headers: {
@@ -2148,10 +2158,8 @@ async function doPoll(taskId, prompt, compression) {
   if (!poll) return;   // task was cancelled
 
   poll.attempts++;
-  const ch = CHANNEL.openai;
-
   try {
-    const res  = await fetch(`${ch.asyncPollBase}${taskId}`, {
+    const res  = await fetch(asyncTaskPollUrl(taskId), {
       headers: { 'Authorization': `Bearer ${state.keys.openai}` },
     });
     const json = await readJsonResponse(res, '异步任务查询');
