@@ -100,6 +100,31 @@ async function handleImageProxy(req, res) {
   res.end(text);
 }
 
+async function handleImageTaskProxy(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.toLowerCase().startsWith('bearer ')) {
+    return sendJson(res, 401, { error: { message: 'Missing API Key' } });
+  }
+  const url = new URL(req.url || '/', `http://localhost:${port}`);
+  let upstreamPath = 'https://tokenstation.top/v1/images/tasks';
+  const init = { method: req.method, headers: { Authorization: auth } };
+  if (req.method === 'GET') {
+    const id = url.searchParams.get('id');
+    if (!id) return sendJson(res, 400, { error: { message: 'missing task id' } });
+    upstreamPath += `/${encodeURIComponent(id)}`;
+  } else if (req.method === 'POST') {
+    if (url.searchParams.get('mode') === 'edit') upstreamPath += '?mode=edit';
+    init.headers['Content-Type'] = 'application/json';
+    init.body = await readBody(req);
+  } else {
+    return sendJson(res, 405, { error: { message: 'method not allowed' } });
+  }
+  const upstream = await fetch(upstreamPath, init);
+  const text = await upstream.text();
+  res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json; charset=utf-8' });
+  res.end(text);
+}
+
 function serveStatic(req, res) {
   const url = new URL(req.url || '/', `http://localhost:${port}`);
   const rawPath = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
@@ -116,6 +141,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'POST' && req.url?.startsWith('/upload.php')) return await handleUpload(req, res);
     if (req.method === 'POST' && req.url?.startsWith('/openai-image.php')) return await handleImageProxy(req, res);
+    if (req.url?.startsWith('/openai-image-task.php')) return await handleImageTaskProxy(req, res);
     if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res);
     sendJson(res, 405, { error: 'method not allowed' });
   } catch (err) {

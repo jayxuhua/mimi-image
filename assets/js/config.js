@@ -27,6 +27,8 @@ export const CHANNEL = {
     name: '咪咪Image',
     supportsRef: true,
     endpoint: 'openai-image.php',
+    asyncEndpoint: 'openai-image-task.php',
+    asyncPollBase: 'openai-image-task.php?id=',
     lsKey: 'oneday_openai_key',
     label: 'OpenAI API Key',
     link: 'https://tokenstation.top',

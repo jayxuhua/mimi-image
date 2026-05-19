@@ -196,8 +196,7 @@ function setHistoryRecords(records) {
 
   await maybeShowReleaseNotes();
 
-  // OpenAI-only MVP does not resume legacy CND async tasks.
-  if (db.hasDb()) await db.clearPendingTasks().catch(() => {});
+  await resumePendingTasks();
 
   // Final scroll after all rows (completed + pending) are in the DOM
   requestAnimationFrame(() => scrollToLatest(true));
@@ -1840,8 +1839,6 @@ async function generate() {
   const prompt      = document.getElementById('prompt').value.trim();
   const compression = parseInt(document.getElementById('compression').value);
 
-  state.asyncMode = 'sync';
-
   if (!state.keys.openai) {
     toast('请先在设置中配置 API Key', 'error');
     openSettings();
@@ -1850,7 +1847,11 @@ async function generate() {
   if (!prompt) { toast('请输入描述词', 'error'); return; }
 
   closeMobileWorkbench();
-  await generateSync(prompt, compression);
+  if (state.asyncMode === 'async') {
+    await generateAsync(prompt, compression);
+  } else {
+    await generateSync(prompt, compression);
+  }
 }
 
 /** CND 渠道将比例字符串转换为 API 所需像素尺寸 */
@@ -2047,16 +2048,19 @@ async function generateAsync(prompt, compression) {
         prompt,
         size:    state.size,
         quality: state.quality,
+        output_format: String(state.format || 'PNG').toLowerCase(),
+        response_format: 'b64_json',
+        n: 1,
       };
 
-      // 异步模式：参考图用 image 字段，支持多张（array[string]）
+      // 异步模式：参考图用 images 字段，支持多张 data URL
       if (state.refImages.length) {
-        body.image = state.refImages.length === 1
-          ? state.refImages[0].dataUrl
-          : state.refImages.map(r => r.dataUrl);
+        body.images = state.refImages.map(r => ({ image_url: r.dataUrl }));
+        body.input_fidelity = 'high';
       }
 
-      const res  = await fetch(ch.asyncEndpoint, {
+      const taskUrl = state.refImages.length ? `${ch.asyncEndpoint}?mode=edit` : ch.asyncEndpoint;
+      const res  = await fetch(taskUrl, {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -2142,7 +2146,7 @@ async function doPoll(taskId, prompt, compression) {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
 
-    // CND async 响应格式: { status: "queued"|"in_progress"|"completed"|"failed"|"unknown", metadata: { url } }
+    // Async task response: { status: "queued"|"running"|"completed"|"failed", data: [...] }
     const status = json.status || 'unknown';
 
     if (status === 'queued') {
@@ -2150,17 +2154,16 @@ async function doPoll(taskId, prompt, compression) {
       if (poll.attempts >= POLL_MAX) throw new Error('任务超时，请稍后刷新页面重试');
       schedulePoll(taskId, prompt, compression);
 
-    } else if (status === 'in_progress') {
+    } else if (status === 'running' || status === 'in_progress') {
       const pct = Math.min(88, Math.round(Math.sqrt(poll.attempts / POLL_MAX) * 110));
       updatePendingStatus(poll.cardId, '进行中', pct + '%', pct);
       if (poll.attempts >= POLL_MAX) throw new Error('任务超时，请稍后刷新页面重试');
       schedulePoll(taskId, prompt, compression);
 
     } else if (status === 'completed') {
-      const imageUrl = json.metadata?.url;
-      if (!imageUrl) throw new Error('任务完成但未返回图片地址');
-      // 规范化为 finishAsyncTask 期望的 data 格式
-      const data = { images: [{ url: imageUrl }] };
+      const images = Array.isArray(json.data) ? json.data : [];
+      if (!images.length) throw new Error('任务完成但未返回图片');
+      const data = { images };
       queueAsyncFinalizeTask(taskId, prompt, compression, data, json.usage || null);
 
     } else if (status === 'failed') {
@@ -2178,7 +2181,7 @@ async function doPoll(taskId, prompt, compression) {
   }
 }
 
-async function persistAsyncImages(rawImages, cardId, recordId, fallbackMime) {
+async function persistAsyncImages(rawImages, cardId, recordId, fallbackMime, fmt = 'PNG', compression = 100) {
   const list = Array.isArray(rawImages) ? rawImages : [];
   const blobs = [];
   for (let i = 0; i < list.length; i++) {
@@ -2186,10 +2189,15 @@ async function persistAsyncImages(rawImages, cardId, recordId, fallbackMime) {
     updatePendingStatus(cardId, '结果整理中', list.length > 1 ? `${i + 1}/${list.length}` : '');
     await nextPaint();
     try {
-      const r = await fetch(img.url);
-      if (!r.ok) continue;
-      const blob = await r.blob();
-      blobs.push(blob);
+      if (img.b64_json) {
+        const sourceMime = img.output_format ? imageMimeFromFormat(img.output_format) : fallbackMime;
+        const rawBlob = base64ToBlob(img.b64_json, sourceMime);
+        blobs.push(await transcodeBlobForOutput(rawBlob, fmt, compression));
+      } else if (img.url) {
+        const r = await fetch(img.url);
+        if (!r.ok) continue;
+        blobs.push(await r.blob());
+      }
     } catch {
       // ignore and continue; if all fail, caller will surface an error
     }
@@ -2204,7 +2212,14 @@ async function finishAsyncTask(taskId, poll, data, prompt, compression, usage) {
 
   const recId = genId();
   const mime = imageMimeFromFormat(params.format);
-  const { storedImages, preparedImages } = await persistAsyncImages(data.images || [], poll.cardId, recId, mime);
+  const { storedImages, preparedImages } = await persistAsyncImages(
+    data.images || [],
+    poll.cardId,
+    recId,
+    mime,
+    params.format,
+    stored?.compression ?? compression,
+  );
 
   if (!storedImages.length) {
     throw new Error('无法加载生成的图像');

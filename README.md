@@ -6,6 +6,7 @@
 
 - 文生图：输入 Prompt 后生成图片。
 - 参考图改图：上传参考图后自动走 `/v1/images/edits`，适合基于原图做修改、重设计、换风格。
+- 异步生图：提交任务后前端轮询结果，减少长请求导致的 524 超时。
 - 多图生成：单次最多生成 3 张，前端会连续请求并合并展示。
 - 输出格式：支持 PNG / JPEG / WEBP。
 - 前端压缩：选择 JPEG / WEBP 后，压缩级别会在浏览器端重新编码图片，实际影响最终文件体积。
@@ -30,6 +31,13 @@ POST https://tokenstation.top/v1/images/generations
 
 ```text
 POST https://tokenstation.top/v1/images/edits
+```
+
+异步任务模式：
+
+```text
+POST https://tokenstation.top/v1/images/tasks
+GET  https://tokenstation.top/v1/images/tasks/{task_id}
 ```
 
 参考图会被前端读成 base64 data URL，并以如下格式发送：
