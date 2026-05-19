@@ -1,4 +1,4 @@
-export const VERSION = '1.0.6-openai';
+export const VERSION = '1.0.7-openai';
 
 export const KV_ASYNC_MODE = 'cnd_ai_async_mode';
 export const KV_USAGE_STATS = 'cnd_ai_usage_stats';

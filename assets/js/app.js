@@ -43,7 +43,7 @@ import Viewer from '/vendor/viewerjs/viewer.esm.js';
 // ─────────────────────────────────────────────────────────────────────────────
 const state = {
   channel: 'openai',
-  asyncMode: 'sync',
+  asyncMode: 'async',
   keys: { openai: '' },
   size: '2:3',
   quality: 'high',
@@ -173,9 +173,8 @@ function setHistoryRecords(records) {
     } catch (_) { /* non-critical */ }
     try {
       await db.hydrateState(state, CHANNEL);
-      // Restore async mode
-      const savedMode = await db.kvGet(KV_ASYNC_MODE);
-      if (savedMode === 'sync' || savedMode === 'async') state.asyncMode = savedMode;
+      state.asyncMode = 'async';
+      await db.kvSet(KV_ASYNC_MODE, 'async');
       // Sync mode-specific size vars from restored state (these fields are new, not in DB)
       if (state.sizeMode === 'pixel') {
         if (state.size && state.size.includes('x')) state.pixelSize = state.size;
