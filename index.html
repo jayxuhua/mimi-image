@@ -417,7 +417,7 @@
           <circle cx="8.5" cy="8.5" r="1.5"/>
           <polyline points="21 15 16 10 5 21"/>
         </svg>
-        <h2>上传参考图</h2>
+        <h2>添加参考图</h2>
         <button type="button" class="modal-close" id="refUploadModalCloseX">✕</button>
       </div>
       <div class="modal-body">
@@ -428,7 +428,7 @@
             <line x1="12" y1="8" x2="12" y2="12"/>
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          文件上传后链接有效期为 <span id="refUploadExpire">48</span> 小时，超期后链接可能失效，需重新上传。
+          参考图只在浏览器本地读取，不会上传或保存到服务器。
         </div>
         <input type="file" id="refUploadInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple
           style="display:none" />
@@ -443,7 +443,7 @@
             <span class="ref-upload-zone-title">点击或拖拽图片到此处</span>
             <span class="ref-upload-zone-hint">JPG / JPEG / PNG，单张不超过 3MB，最多 2 张</span>
           </div>
-          <div class="ref-upload-zone-busy" id="refUploadBusy" style="display:none;">上传中…</div>
+          <div class="ref-upload-zone-busy" id="refUploadBusy" style="display:none;">读取中…</div>
         </label>
       </div>
       <div class="modal-footer">

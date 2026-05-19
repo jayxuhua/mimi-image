@@ -595,23 +595,6 @@ function isValidRefUploadFile(file) {
   return { ok: true };
 }
 
-async function uploadRefFileToServer(file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch('upload.php', { method: 'POST', body: fd });
-  let json = {};
-  try {
-    json = await res.json();
-  } catch (_) { /* ignore */ }
-  if (!res.ok || !json.ok) {
-    throw new Error(json.error || `HTTP ${res.status}`);
-  }
-  if (!json.url || typeof json.url !== 'string') {
-    throw new Error('服务器未返回有效链接');
-  }
-  return json.url;
-}
-
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -655,12 +638,11 @@ async function processRefUploadFiles(fileList) {
       if (state.refImages.length >= maxRef) break;
       try {
         const dataUrl = await readFileAsDataUrl(file);
-        const url = await uploadRefFileToServer(file);
-        state.refImages.push({ name: file.name, url, dataUrl });
+        state.refImages.push({ name: file.name, url: dataUrl, dataUrl });
         renderRefImages();
         added++;
       } catch (err) {
-        toast(`${file.name}: ${err.message || '上传失败'}`, 'error');
+        toast(`${file.name}: ${err.message || '读取失败'}`, 'error');
       }
     }
     if (added) {
@@ -2070,8 +2052,8 @@ async function generateAsync(prompt, compression) {
       // 异步模式：参考图用 image 字段，支持多张（array[string]）
       if (state.refImages.length) {
         body.image = state.refImages.length === 1
-          ? state.refImages[0].url
-          : state.refImages.map(r => r.url);
+          ? state.refImages[0].dataUrl
+          : state.refImages.map(r => r.dataUrl);
       }
 
       const res  = await fetch(ch.asyncEndpoint, {

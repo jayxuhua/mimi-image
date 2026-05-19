@@ -18,7 +18,7 @@
 前端请求本地代理：
 
 - `openai-image.php`：转发生图请求到 `tokenstation.top`
-- `upload.php`：上传参考图到本机 `uploads/`
+- 参考图：浏览器本地读取为 base64，不上传或保存到服务器
 
 无参考图时：
 
@@ -61,7 +61,6 @@ http://localhost:8787
 这个本地服务会模拟：
 
 - 静态文件服务
-- `/upload.php`
 - `/openai-image.php`
 
 ## 服务器部署
@@ -88,17 +87,12 @@ image.tokenstation.top {
 cd /var/www
 git clone https://github.com/jayxuhua/mimi-image.git mimi-image
 cd /var/www/mimi-image
-mkdir -p uploads
-chown -R www-data:www-data uploads
-chmod -R 755 uploads
 ```
 
 服务器需要：
 
 - PHP 7.4+ / PHP 8.x
 - PHP `curl`
-- PHP `fileinfo`
-- `uploads/` 目录可写
 - 服务器能访问 `https://tokenstation.top`
 
 ## Cloudflare
@@ -124,6 +118,7 @@ Content: 服务器 IP
 - API Key 保存在用户浏览器 IndexedDB，不写入服务器数据库。
 - 当前版本没有登录、积分、支付系统。
 - PNG 文件通常较大；如果需要更小体积，建议输出 WEBP 或 JPEG，并降低压缩级别。
+- 参考图只在浏览器本地读取，不会落盘到服务器。
 - 参考图改图依赖中转站 `/v1/images/edits` 能力。
 
 ## License
