@@ -1,8 +1,58 @@
 import { CHANNEL, CND_RATIO_TO_PX } from '../config.js';
 
-export function resolveOpenAIImageSize(size) {
-  if (!size || size === 'auto') return 'auto';
-  if (size === '1024x1024' || size === '1024x1536' || size === '1536x1024') return size;
+function roundTo16(value) {
+  return Math.max(16, Math.round(value / 16) * 16);
+}
+
+function parseRatio(size) {
+  if (!size || size === 'auto') return { w: 1, h: 1 };
+  const px = String(size).match(/^(\d+)x(\d+)$/);
+  if (px) return { w: Number(px[1]), h: Number(px[2]) };
+  const ratio = String(size).match(/^(\d+):(\d+)$/);
+  if (ratio) return { w: Number(ratio[1]), h: Number(ratio[2]) };
+  const mapped = CND_RATIO_TO_PX[size] || '1024x1024';
+  const [w, h] = mapped.split('x').map(Number);
+  return { w, h };
+}
+
+function fitToImage2Limits(w, h) {
+  const MAX_EDGE = 3840;
+  const MAX_PIXELS = 8_294_400;
+  const MIN_PIXELS = 655_360;
+  const ratio = Math.max(w, h) / Math.max(1, Math.min(w, h));
+  if (ratio > 3) {
+    if (w >= h) h = w / 3;
+    else w = h / 3;
+  }
+  let scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+  if (w * h * scale * scale > MAX_PIXELS) scale = Math.sqrt(MAX_PIXELS / (w * h));
+  if (w * h * scale * scale < MIN_PIXELS) scale = Math.sqrt(MIN_PIXELS / (w * h));
+  return `${roundTo16(w * scale)}x${roundTo16(h * scale)}`;
+}
+
+export function resolveOpenAIImageSize(size, resolution = '1k') {
+  const res = String(resolution || '1k').toLowerCase();
+  const { w, h } = parseRatio(size);
+  const landscape = w >= h;
+  const ratio = Math.max(w, 1) / Math.max(h, 1);
+  if (res === '1k') {
+    const longEdge = 1024;
+    return landscape
+      ? fitToImage2Limits(longEdge, longEdge / ratio)
+      : fitToImage2Limits(longEdge * ratio, longEdge);
+  }
+  if (res === '2k') {
+    const longEdge = 2048;
+    return landscape
+      ? fitToImage2Limits(longEdge, longEdge / ratio)
+      : fitToImage2Limits(longEdge * ratio, longEdge);
+  }
+  if (res === '4k') {
+    const longEdge = 3840;
+    return landscape
+      ? fitToImage2Limits(longEdge, longEdge / ratio)
+      : fitToImage2Limits(longEdge * ratio, longEdge);
+  }
   return CND_RATIO_TO_PX[size] || '1024x1024';
 }
 
@@ -47,6 +97,7 @@ export async function generateOpenAIImages({
   apiKey,
   prompt,
   size,
+  resolution = '1k',
   quality,
   format,
   compression,
@@ -63,7 +114,7 @@ export async function generateOpenAIImages({
   const body = {
     model: ch.defaultModel,
     prompt,
-    size: resolveOpenAIImageSize(size),
+    size: resolveOpenAIImageSize(size, resolution),
     quality: normalizeOpenAIQuality(quality),
     output_format: outputFormat,
     response_format: 'b64_json',

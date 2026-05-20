@@ -46,9 +46,10 @@ const state = {
   asyncMode: 'async',
   keys: { openai: '' },
   size: '2:3',
-  quality: 'high',
-  format: 'PNG',
-  compression: 100,
+  resolution: '1k',
+  quality: 'low',
+  format: 'JPEG',
+  compression: 85,
   count: 1,
   loading: false,          // true only while a sync request is in flight
   refImages: [],
@@ -174,6 +175,10 @@ function setHistoryRecords(records) {
     try {
       await db.hydrateState(state, CHANNEL);
       state.asyncMode = 'async';
+      state.resolution = state.resolution || '1k';
+      state.quality = qualityForResolution(state.resolution);
+      state.format = 'JPEG';
+      state.compression = 85;
       await db.kvSet(KV_ASYNC_MODE, 'async');
       // Sync mode-specific size vars from restored state (these fields are new, not in DB)
       if (state.sizeMode === 'pixel') {
@@ -196,12 +201,16 @@ function setHistoryRecords(records) {
 
   // ── Sync UI ──
   syncModeButtons();
+  state.resolution = state.resolution || '1k';
+  state.quality = qualityForResolution(state.resolution);
+  state.format = 'JPEG';
   updateKeyStatus();
   updateRefImageButton();
   clampCount();
   syncSizeSection();
   syncFormatSection();
   syncCompressionSection();
+  syncResolutionButtons();
   syncExperimentalSection();
 
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -301,6 +310,8 @@ function wireEvents() {
   // Quality seg
   document.querySelectorAll('[data-q]').forEach(el =>
     el.addEventListener('click', () => selectQuality(el)));
+  document.querySelectorAll('[data-resolution]').forEach(el =>
+    el.addEventListener('click', () => selectResolution(el)));
 
   // Format seg
   document.querySelectorAll('[data-fmt]').forEach(el =>
@@ -309,7 +320,7 @@ function wireEvents() {
   // Compression slider
   document.getElementById('compression').addEventListener('input', function () {
     document.getElementById('compressionVal').textContent = this.value;
-    state.compression = parseInt(this.value);
+    state.compression = parseInt(this.value, 10);
   });
 
   // Count stepper
@@ -781,7 +792,7 @@ function syncSizeSection() {
 
   // 模式切换 seg：所有渠道均显示
   const modeSegEl = document.getElementById('sizeModeSeg');
-  modeSegEl.style.display = '';
+  modeSegEl.style.display = 'none';
 
   document.querySelectorAll('#sizeModeSeg .seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.sizeMode === state.sizeMode));
@@ -880,31 +891,52 @@ function selectQuality(el) {
   document.querySelectorAll('[data-q]').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
   state.quality = el.dataset.q;
+  syncResolutionButtons();
+}
+
+function selectResolution(el) {
+  document.querySelectorAll('[data-resolution]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  state.resolution = el.dataset.resolution || '1k';
+  state.quality = qualityForResolution(state.resolution);
+  document.querySelectorAll('[data-q]').forEach(e =>
+    e.classList.toggle('active', e.dataset.q === state.quality));
+  if (state.resolution === '4k') toast('4K 图生成很慢，任务会在后台排队处理', 'info', 4500);
+}
+
+function syncResolutionButtons() {
+  document.querySelectorAll('[data-resolution]').forEach(e =>
+    e.classList.toggle('active', e.dataset.resolution === state.resolution));
+  document.querySelectorAll('[data-q]').forEach(e =>
+    e.classList.toggle('active', e.dataset.q === state.quality));
+}
+
+function qualityForResolution(resolution) {
+  if (resolution === '4k') return 'high';
+  if (resolution === '2k') return 'medium';
+  return 'low';
 }
 
 function selectFormat(el) {
   document.querySelectorAll('[data-fmt]').forEach(e => e.classList.remove('active'));
-  el.classList.add('active');
-  state.format = el.dataset.fmt;
+  const jpegBtn = document.querySelector('[data-fmt="JPEG"]');
+  (jpegBtn || el).classList.add('active');
+  state.format = 'JPEG';
   syncCompressionSection();
 }
 
 /** 异步模式时隐藏输出格式区块 */
 function syncFormatSection() {
   const el = document.getElementById('formatSection');
-  if (el) el.style.display = state.asyncMode === 'async' ? 'none' : '';
+  if (el) el.style.display = 'none';
 }
 
-/** 根据当前格式和模式显示/隐藏压缩滑块（仅同步 + JPEG/WEBP 需要） */
+/** 根据当前格式显示/隐藏压缩滑块。JPG 默认输出时保持可见。 */
 function syncCompressionSection() {
   const el = document.getElementById('compressionSection');
   if (!el) return;
-  if (state.asyncMode === 'async') {
-    el.style.display = 'none';
-    return;
-  }
-  const fmt = state.format.toUpperCase();
-  el.style.display = (fmt === 'JPEG' || fmt === 'WEBP') ? '' : 'none';
+  state.format = 'JPEG';
+  el.style.display = '';
 }
 
 /** CND/自定义渠道显示实验性功能区块（当前暂时隐藏） */
@@ -1856,7 +1888,8 @@ async function generate() {
   if (state.loading) return;
 
   const prompt      = document.getElementById('prompt').value.trim();
-  const compression = parseInt(document.getElementById('compression').value);
+  state.format = 'JPEG';
+  const compression = parseInt(document.getElementById('compression').value, 10);
 
   if (!state.keys.openai) {
     toast('请先在设置中配置 API Key', 'error');
@@ -1896,6 +1929,7 @@ async function generateSync(prompt, compression) {
   const chatRow = createChatRow(prompt, {
     size:    state.size,
     quality: state.quality,
+    resolution: state.resolution,
     format:  state.format,
     channel: state.channel,
     count:   state.count,
@@ -1909,7 +1943,8 @@ async function generateSync(prompt, compression) {
       apiKey: state.keys.openai,
       prompt,
       size: state.size,
-      quality: state.quality,
+      resolution: state.resolution,
+      quality: qualityForResolution(state.resolution),
       format: state.format,
       compression,
       count: state.count,
@@ -1937,6 +1972,7 @@ async function generateSync(prompt, compression) {
       channel:     state.channel,
       prompt,
       size:        state.size,
+      resolution:  state.resolution,
       quality:     state.quality,
       format:      state.format,
       compression,
@@ -2053,6 +2089,7 @@ async function generateAsync(prompt, compression) {
     chatRow = createChatRow(prompt, {
       size:    state.size,
       quality: state.quality,
+      resolution: state.resolution,
       format:  state.format,
       channel: state.channel,
       count:   batchN,
@@ -2065,12 +2102,15 @@ async function generateAsync(prompt, compression) {
       const body = {
         model:   CHANNEL.openai.defaultModel,
         prompt,
-        size:    resolveOpenAIImageSize(state.size),
-        quality: state.quality,
-        output_format: String(state.format || 'PNG').toLowerCase(),
+        size:    resolveOpenAIImageSize(state.size, state.resolution),
+        quality: qualityForResolution(state.resolution),
+        output_format: 'jpeg',
         response_format: 'b64_json',
         n: 1,
       };
+      if (Number.isFinite(compression)) {
+        body.output_compression = Math.max(1, Math.min(100, compression));
+      }
 
       // 异步模式：参考图用 images 字段，支持多张 data URL
       if (state.refImages.length) {
@@ -2111,7 +2151,8 @@ async function generateAsync(prompt, compression) {
         compression,
         params: {
           size: state.size,
-          quality: state.quality,
+          resolution: state.resolution,
+          quality: qualityForResolution(state.resolution),
           format: state.format,
           count: 1,
         },
