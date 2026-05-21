@@ -1,7 +1,7 @@
 # AI Agent Notes
 
-- The UI intentionally hides the legacy generation quality selector, output format selector, and pixel-size selector. Keep the code paths because they may be reused later.
-- User-facing output is forced to JPG/JPEG for now. The JPG compression quality slider remains visible and is sent as `output_compression` for async tasks.
+- The UI intentionally hides the legacy generation quality selector and pixel-size selector. Keep the code paths because they may be reused later.
+- The output format selector is visible again and supports PNG / JPEG / WEBP. `output_compression` is sent only for JPEG and WEBP async tasks; PNG hides the compression slider.
 - The visible `1K / 2K / 4K` control maps to official `size` and `quality` parameters for `gpt-image-2`. Cost depends on both fields, so do not leave 1K on hidden high quality.
   - `1K` -> long edge around `1024px`
   - `2K` -> long edge around `2048px`

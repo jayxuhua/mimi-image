@@ -185,7 +185,7 @@
         </div>
 
         <!-- Output Format -->
-        <div class="section" id="formatSection" style="display:none;" hidden>
+        <div class="section" id="formatSection">
           <div class="section-label">输出格式</div>
           <div class="seg">
             <button class="seg-btn" data-fmt="PNG">PNG</button>
@@ -196,7 +196,7 @@
 
         <!-- Compression (JPEG / WEBP only) -->
         <div class="section" id="compressionSection">
-          <div class="section-label">JPG 压缩质量</div>
+          <div class="section-label" id="compressionLabel">JPG 压缩质量</div>
           <div class="slider-wrap">
             <input type="range" id="compression" min="1" max="100" value="85" />
             <span class="slider-val"><span id="compressionVal">85</span></span>
@@ -501,6 +501,6 @@
   <!-- Toast container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="assets/js/app.js?v=1.0.9-openai"></script>
+  <script type="module" src="assets/js/app.js?v=1.0.10-openai"></script>
 </body>
 </html>

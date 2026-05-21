@@ -177,8 +177,8 @@ function setHistoryRecords(records) {
       state.asyncMode = 'async';
       state.resolution = state.resolution || '1k';
       state.quality = qualityForResolution(state.resolution);
-      state.format = 'JPEG';
-      state.compression = 85;
+      state.format = normalizeOutputFormat(state.format);
+      state.compression = Number.isFinite(Number(state.compression)) ? Number(state.compression) : 85;
       await db.kvSet(KV_ASYNC_MODE, 'async');
       // Sync mode-specific size vars from restored state (these fields are new, not in DB)
       if (state.sizeMode === 'pixel') {
@@ -203,7 +203,7 @@ function setHistoryRecords(records) {
   syncModeButtons();
   state.resolution = state.resolution || '1k';
   state.quality = qualityForResolution(state.resolution);
-  state.format = 'JPEG';
+  state.format = normalizeOutputFormat(state.format);
   updateKeyStatus();
   updateRefImageButton();
   clampCount();
@@ -919,24 +919,47 @@ function qualityForResolution(resolution) {
 
 function selectFormat(el) {
   document.querySelectorAll('[data-fmt]').forEach(e => e.classList.remove('active'));
-  const jpegBtn = document.querySelector('[data-fmt="JPEG"]');
-  (jpegBtn || el).classList.add('active');
-  state.format = 'JPEG';
+  el.classList.add('active');
+  state.format = normalizeOutputFormat(el.dataset.fmt);
   syncCompressionSection();
 }
 
-/** 异步模式时隐藏输出格式区块 */
-function syncFormatSection() {
-  const el = document.getElementById('formatSection');
-  if (el) el.style.display = 'none';
+function normalizeOutputFormat(format) {
+  const fmt = String(format || 'JPEG').toUpperCase();
+  if (fmt === 'JPG') return 'JPEG';
+  if (fmt === 'PNG' || fmt === 'JPEG' || fmt === 'WEBP') return fmt;
+  return 'JPEG';
 }
 
-/** 根据当前格式显示/隐藏压缩滑块。JPG 默认输出时保持可见。 */
+function syncFormatButtons() {
+  state.format = normalizeOutputFormat(state.format);
+  document.querySelectorAll('[data-fmt]').forEach(e =>
+    e.classList.toggle('active', e.dataset.fmt === state.format));
+}
+
+/** 显示输出格式区块，允许用户选择 PNG/JPG/WEBP */
+function syncFormatSection() {
+  const el = document.getElementById('formatSection');
+  if (el) el.style.display = '';
+  syncFormatButtons();
+}
+
+/** 根据当前格式显示/隐藏压缩滑块。PNG 无压缩质量参数。 */
 function syncCompressionSection() {
   const el = document.getElementById('compressionSection');
   if (!el) return;
-  state.format = 'JPEG';
-  el.style.display = '';
+  const fmt = normalizeOutputFormat(state.format);
+  state.format = fmt;
+  state.compression = Math.max(1, Math.min(100, Number(state.compression) || 85));
+  const slider = document.getElementById('compression');
+  const value = document.getElementById('compressionVal');
+  if (slider) slider.value = String(state.compression);
+  if (value) value.textContent = String(state.compression);
+  const supportsCompression = fmt === 'JPEG' || fmt === 'WEBP';
+  el.style.display = supportsCompression ? '' : 'none';
+  const label = document.getElementById('compressionLabel');
+  if (label) label.textContent = fmt === 'WEBP' ? 'WEBP 压缩质量' : 'JPG 压缩质量';
+  syncFormatButtons();
 }
 
 /** CND/自定义渠道显示实验性功能区块（当前暂时隐藏） */
@@ -1888,8 +1911,8 @@ async function generate() {
   if (state.loading) return;
 
   const prompt      = document.getElementById('prompt').value.trim();
-  state.format = 'JPEG';
   const compression = parseInt(document.getElementById('compression').value, 10);
+  state.format = normalizeOutputFormat(state.format);
 
   if (!state.keys.openai) {
     toast('请先在设置中配置 API Key', 'error');
@@ -2104,11 +2127,11 @@ async function generateAsync(prompt, compression) {
         prompt,
         size:    resolveOpenAIImageSize(state.size, state.resolution),
         quality: qualityForResolution(state.resolution),
-        output_format: 'jpeg',
+        output_format: state.format.toLowerCase(),
         response_format: 'b64_json',
         n: 1,
       };
-      if (Number.isFinite(compression)) {
+      if ((state.format === 'JPEG' || state.format === 'WEBP') && Number.isFinite(compression)) {
         body.output_compression = Math.max(1, Math.min(100, compression));
       }
 
@@ -2644,7 +2667,8 @@ function applyExample(idx) {
 
   document.getElementById('compression').value     = ex.output_compression;
   document.getElementById('compressionVal').textContent = ex.output_compression;
-  state.compression = ex.output_compression;
+  state.compression = ex.output_compression ?? 85;
+  syncCompressionSection();
 
   state.count = 1;
   syncCountStepperUi();
@@ -2776,9 +2800,10 @@ async function useConfig(recId) {
   const fmtEl = document.querySelector(`[data-fmt="${rec.format}"]`);
   if (fmtEl) selectFormat(fmtEl);
 
-  document.getElementById('compression').value      = rec.compression ?? 100;
-  document.getElementById('compressionVal').textContent = rec.compression ?? 100;
-  state.compression = rec.compression ?? 100;
+  document.getElementById('compression').value      = rec.compression ?? 85;
+  document.getElementById('compressionVal').textContent = rec.compression ?? 85;
+  state.compression = rec.compression ?? 85;
+  syncCompressionSection();
 
   state.count = Math.min(maxCount(), Math.max(1, rec.count || 1));
   syncCountStepperUi();
